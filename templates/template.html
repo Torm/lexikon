@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{TITLE}</title>
+<script src="assets/notarium/script.js"></script>
+<link rel="stylesheet" type="text/css" href="assets/notarium/layout.css">
+<style>{STYLE}</style>
+</head>
+<body>
+<header id="header"><span class="toolbar-heading">{TITLE}</span></header>
+<main id="main" class="main-both">
+  <nav class="toolbar" id="toolbar">
+    <div class="menu-container">
+      <div id="label-view-button" class="toolbar-button">
+        <div class="tooltip">Overview</div>
+      </div>
+      <div id="both-view-button" class="toolbar-button"><div class="tooltip">Overview & details</div></div>
+      <div id="article-view-button" class="toolbar-button"><div class="tooltip">Details</div></div>
+    </div>
+<!--    <div class="menubar-spacer">·</div>-->
+<!--    <div class="menu-container">-->
+<!--      <div id="sort-by-section-button" class="toolbar-button">S<div class="tooltip">Arrange in sections</div></div>-->
+<!--      <div id="sort-by-tag-button" class="toolbar-button">T<div class="tooltip">Arrange in tags</div></div>-->
+<!--    </div>-->
+    <div class="menubar-spacer">·</div>
+    <div class="menu-container">
+      <div id="close-all-button" class="toolbar-button"><div class="tooltip">Close all articles</div></div>
+      <div id="open-all-button" class="toolbar-button"><div class="tooltip">Open all articles</div></div>
+    </div>
+    <div class="menubar-spacer">·</div>
+    <div class="menu-container">
+      <div id="highlight-off-button" class="toolbar-button">P<div class="tooltip">Highlight: None</div></div>
+      <div id="review-highlight-button" class="toolbar-button">L<div class="tooltip">Highlight: Review</div></div>
+      <div id="highlight-incomplete-button" class="toolbar-button">R<div class="tooltip">Highlight: Incomplete<br><br>Highlight incomplete articles.</div></div>
+    </div>
+  </nav>
+  <div id="label-tab">
+    {OVERVIEW}
+  </div>
+  <div id="article-tab">
+    <div id="articles">
+      {DETAILS}
+    </div>
+ </div>
+</main>
+<footer></footer>
+<div id="progress-panel">
+  <div id="progress-select">
+    <div data-level="0" class="progress-level"><div></div><div>Incomplete</div></div>
+    <div data-level="1" class="progress-level"><div class="level1"></div><div>Complete</div></div>
+  </div>
+  <div id="progress-log">
+    <div class="progress-log-entry"><div class="progress-log-icon level5"></div>2024-Jul-31 (46 hours ago)</div>
+    <div class="progress-log-entry"><div class="progress-log-icon level3"></div>2024-Jul-31 (46 hours ago)</div>
+    <div class="progress-log-entry"><div class="progress-log-icon level4"></div>2024-Jul-31 (46 hours ago)</div>
+    <div class="progress-log-entry"><div class="progress-log-icon level1"></div>2024-Jul-31 (46 hours ago)</div>
+  </div>
+</div>
+</body>
+</html>
