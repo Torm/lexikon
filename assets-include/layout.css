@@ -12,13 +12,15 @@ html {
 body {
     background-color: #3a3a3a;
     color: #dddddd;
-    min-height: 100vh;
-    min-width: 100vw;
+    max-height: 100vh;
+    max-width: 100vw;
+    height: 100vh;
+    width: 100vw;
     display: grid;
     grid-template-areas: "header" "main" "footer";
     margin: 0;
     grid-template-rows: 29px 1fr 10px;
-    //overflow-y: clip;
+    overflow: hidden;
 }
 
 header {
@@ -31,11 +33,12 @@ header {
 main {
     grid-area: main;
     display: grid;
-    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
 }
 .main-both {
     grid-template-areas: "menu labels articles";
-    grid-template-columns: 32px 3fr 2fr;
+    grid-template-columns: 32px 1fr max-content;
 }
 .main-overview {
     grid-template-areas: "menu labels";
@@ -60,15 +63,26 @@ footer {
 
 #label-tab h1, #label-tab h2, #label-tab h3, #label-tab h4, #label-tab h5, #label-tab h6, #label-tab p {
     margin: 0.5rem 1rem;
+    padding: 0;
     font-family: sans-serif;
+    width: fit-content;
 }
 
 #label-tab {
     grid-area: labels;
     background-color: #333333;
     font-family: sans-serif;
-    width: 1fr;
+    flex-direction: column;
+    gap: 0;
+    margin: 0;
     overflow-y: scroll;
+    height: 100%;
+}
+
+.label-tab-text {
+    background-color: rgba(0, 0, 0, 15%);
+    padding: 0.25rem 0.5rem;
+    display: inline-block;
 }
 
 #labels-hierarchy {
@@ -79,9 +93,9 @@ footer {
 }
 
 #label-tab > p, #label-tab > h1, #label-tab > h2, #label-tab > h3, #label-tab > h4, #label-tab > h5, #label-tab > h6 {
-    background-color: rgba(0, 0, 0, 15%);
+    //background-color: rgba(0, 0, 0, 15%);
     margin: 0.5rem;
-    padding: 0.25rem 0.5rem;
+    //padding: 0.25rem 0.5rem;
     width: fit-content;
     //border-left: 2px solid rgba(0, 0, 0, 15%);
 }
@@ -94,7 +108,6 @@ footer {
     justify-items: center;
     align-items: center;
     padding: 0.25rem 0.5rem;
-    resize: horizontal;
     margin: 0.5rem;
     background-color: rgba(0, 0, 0, 15%);
     width: fit-content;
@@ -110,38 +123,52 @@ footer {
     margin: 0.25em;
     display: inline grid;
     grid-template-areas: "checkbox header";
-    grid-gap: 1px;
+    //grid-gap: 1px;
     font-family: "Liberation Serif", serif;
     font-size: 12px;
-    border: 2px solid #222222;
+    border: 1px solid #222222;
 //border-left: 1px solid #111111;
 //border-right: 1px solid #111111;
 //border-top: 1px solid #111111;
     cursor: pointer;
+    position: relative;
 }
 
 .label:hover {
-    border: 2px solid #595959;
+    border: 1px solid #555555;
 }
 
 .label > .header {
     grid-area: header;
     height: 19px;
-    //background-color: #703d3d;
+    //background-color: #353535;
     display: flex;
     align-items: center;
     font-family: "Liberation Sans", serif;
     font-size: 12px;
     font-weight: bold;
-    padding-left: 5px;
-    padding-right: 5px;
 //background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,255,0,25%) 100%);
+}
+
+.label > .cind {
+    position: absolute;
+    background-image: url("cind.png");
+    filter: opacity(50%);
+    width: 8px;
+    height: 8px;
+    right: 0;
+    top: 0;
 }
 
 .label > .progress {
     grid-area: checkbox;
     height: 19px;
     width: 19px;
+}
+
+.label-title {
+    margin-left: 4px;
+    margin-right: 4px;
 }
 
 #label-view-button {
@@ -155,12 +182,14 @@ footer {
 }
 
 .progress {
-    background-color: #4a4a4a;
+    //background-color: #4a4a4a;
+    background-color: #404040;
     font-weight: bolder;
     font-size: 15px;
     user-select: none;
     display: flow;
     text-align: center;
+    //filter: saturate(0%) brightness(80%);
 }
 
 .progress-completed {
@@ -173,10 +202,13 @@ footer {
 
 .level1 {
     color: #34baf4;
-    background-image: url("pearl1.png");
+    //background-image: url("pearl1.png");
+    background-image: url("pearl4.png");
     background-repeat: no-repeat;
     background-position: center;
-    filter: hue-rotate(30deg);
+    //filter: hue-rotate(30deg);
+    //background-color: #b9b236;
+    //filter: brightness(150%);
 }
 
 .level2 {
@@ -212,29 +244,41 @@ footer {
 #article-tab {
     grid-area: articles;
 //background-color: #505050;
-    background-color: #2c2c2c;
+    //background-color: #2c2c2c;
+    background-color: #333333;
+    padding: 0;
+    overflow-y: scroll;
+    height: 100%;
 }
 
 #articles {
     display: flex;
     flex-direction: column;
-    padding: 0.5em;
-    resize: horizontal;
-    overflow-y: scroll;
+    padding: 0.25rem;
+    //align-items: end;
+    background-color: rgba(0, 0, 0, 15%);
+    width: 90ch;
+    max-width: 90ch;
+    margin: 0.5rem 0.5rem;
+    min-height: 95%;
+    gap: 0.5rem;
 }
 
 .article {
     display: none;
-    border: 2px solid #171717;
-    margin: 0.25em;
+    border: 1px solid #171717;
+    margin: 0.25rem 0.5rem;
     background-color: #171717;
-    grid-gap: 2px;
+    grid-gap: 1px;
+    min-width: fit-content;
+    width: 1fr;
 }
 .article-open {
     grid-template-areas: "menu" "content";
 }
 .article-closed {
     grid-template-areas: "menu";
+    border-bottom: 2px solid #171717;
 }
 
 .article > .menu {
@@ -282,7 +326,7 @@ footer {
 }
 
 .article > .content {
-    background-color: #554a45;
+    background-color: #474747;
     grid-area: content;
     padding: 0.5em;
     grid-gap: 0.5em;
@@ -341,11 +385,12 @@ footer {
 }
 
 .opened-label {
-    border: 2px solid #7c7c7c;
+    border: 1px solid #ffffff;
+    filter: saturate(50%) brightness(125%);
 }
 
 .opened-label:hover {
-    border: 2px solid #a3a3a3;
+    border: 1px solid #efefef;
 }
 
 .opened-article {
@@ -523,8 +568,29 @@ footer {
     user-select: none;
     font-size: 13px;
     font-family: monospace;
+    z-index: 10;
 }
 
 .context-panel {
     display: none;
+}
+
+.label-index {
+    height: 100%;
+    margin: 0;
+    padding: 0 2px;
+    //border-right: 1px solid rgba(0, 0, 0, 0.5);
+    font-size: 9px;
+    font-family: sans-serif;
+    line-height: 100%;
+    text-align: center;
+    color: rgb(255, 255, 255);
+    font-weight: lighter;
+    user-select: none;
+    background-color: rgba(0, 0, 0, 0.33);
+    align-content: center;
+}
+.label-index > * {
+    margin: 0;
+    padding: 0;
 }

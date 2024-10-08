@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{PathBuf};
 use std::rc::Rc;
 use include_dir::include_dir;
-use khi::{Compound, Dictionary, Element, List, Text, Tuple, Value};
+use khi::{Compound, Dictionary, Element, List, Tagged, Text, Tuple, Value};
 use khi::parse::parse_dictionary_str;
 use khi::pdm::{ParsedDictionary, ParsedList, ParsedValue};
 use khi::tex::{BreakMode, PreprocessorError, write_tex_with};
@@ -85,7 +86,6 @@ fn write_assets(path: &PathBuf) -> Result<(), String> {
     for asset in assets.files() {
         let mut path = path.clone();
         path.push(asset.path());
-        eprintln!("{}", path.to_str().unwrap());
         let mut file = File::create(&path).unwrap();
         if let Err(err) = file.write_all(asset.contents()) {
             return Err(format!("Error writing asset file {}", path.to_str().unwrap()));
@@ -102,10 +102,12 @@ fn process_file(file_name: &str) -> Result<(), String> {
     let mut atypes = vec![];
     let mut articles = vec![];
     let mut structure = vec![];
+    let mut progress_types = vec![];
+    let mut preamble = None;
 
-    parse_file(file_name, &mut title, &mut atypes, &mut articles, &mut structure)?;
+    parse_file(file_name, &mut title, &mut atypes, &mut articles, &mut structure, &mut preamble)?;
     let result_name = format!("{}.html", &file_name[0..file_name.len() - 4]); // - .nta
-    let result = generate_page(&title, &articles, &atypes, &structure);
+    let result = generate_page(&title, &articles, &atypes, &structure, &progress_types, &preamble);
     let mut result_file = File::create(&result_name).unwrap();
     match result_file.write_all(result.as_bytes()) {
         Ok(_) => Ok(()),
@@ -113,7 +115,14 @@ fn process_file(file_name: &str) -> Result<(), String> {
     }
 }
 
-fn parse_file(file_name: &str, title: &mut String, atypes: &mut Vec<Rc<ArticleType>>, articles: &mut Vec<Rc<Article>>, structures: &mut Vec<Rc<Structure>>) -> Result<(), String> {
+fn parse_file(
+    file_name: &str,
+    title: &mut String,
+    atypes: &mut Vec<Rc<ArticleType>>,
+    articles: &mut Vec<Rc<Article>>,
+    structures: &mut Vec<Rc<Structure>>,
+    preamble: &mut Option<String>
+) -> Result<(), String> {
     let file = File::open(file_name);
     if file.is_err() {
         return Err(format!("Error opening file {file_name}; does it exist?"));
@@ -174,8 +183,18 @@ fn parse_file(file_name: &str, title: &mut String, atypes: &mut Vec<Rc<ArticleTy
         return Err(format!("An \"Articles\" list section must exist."));
     };
 
+    *preamble = if let Some(preamble) = parse.get("Preamble") {
+        let tex = match write_tex_with(preamble, BreakMode::Never) {
+            Ok(t) => t,
+            Err(_) => return Err(String::from("Preamble preprocessor error.")),
+        };
+        Some(tex)
+    } else {
+        None
+    };
+
     for (k, _v) in parse.iter() {
-        if k != "Document" && k != "Types" && k != "Articles" {
+        if k != "Document" && k != "Types" && k != "Articles" && k != "Preamble" {
             return Err(format!("Found unexpected section {k}."));
         }
     }
@@ -207,7 +226,7 @@ fn read_types(types: &ParsedDictionary) -> Result<Vec<Rc<ArticleType>>, String> 
             }
             colour.unwrap()
         } else {
-            "#4a4a4a".into()
+            "#636363".into()
         };
         a.push(Rc::new(ArticleType { name: name.into(), colour }))
     }
@@ -216,26 +235,37 @@ fn read_types(types: &ParsedDictionary) -> Result<Vec<Rc<ArticleType>>, String> 
 }
 
 fn read_articles(article_list: &ParsedList, atypes: &Vec<Rc<ArticleType>>, articles: &mut Vec<Rc<Article>>, structure: &mut Vec<Rc<Structure>>) -> Result<(), String> {
+    let mut article_map = HashMap::new();
+
     for article in article_list.iter() {
         if !article.is_tagged() {
             return Err(format!("Element of Articles section must be a tagged value"));
         }
         let tag = article.as_tagged().unwrap();
         let name = tag.name.as_ref();
+        let value = tag.get();
         if name == "H1" || name == "H2" || name == "H3" || name == "H4" || name == "H5" || name == "H6" {
-            let tex = parse_content_text(tag.value.as_ref())?;
+            let (index, heading) = if value.is_tuple() {
+                let value = value.as_tuple().unwrap();
+                if value.len() != 2 {
+                    return Err(String::from("Heading must be tuple with 1 or 2 elements."));
+                }
+                (Some(parse_content_text(value.get(0).unwrap())?), parse_content_text(value.get(1).unwrap())?)
+            } else {
+                (None, parse_content_text(value)?)
+            };
             if name == "H1" {
-                structure.push(Rc::new(Structure::Heading(1, tex)));
+                structure.push(Rc::new(Structure::Heading(1, index, heading)));
             } else if name == "H2" {
-                structure.push(Rc::new(Structure::Heading(2, tex)));
+                structure.push(Rc::new(Structure::Heading(2, index, heading)));
             } else if name == "H3" {
-                structure.push(Rc::new(Structure::Heading(3, tex)));
+                structure.push(Rc::new(Structure::Heading(3, index, heading)));
             } else if name == "H4" {
-                structure.push(Rc::new(Structure::Heading(4, tex)));
+                structure.push(Rc::new(Structure::Heading(4, index, heading)));
             } else if name == "H5" {
-                structure.push(Rc::new(Structure::Heading(5, tex)));
+                structure.push(Rc::new(Structure::Heading(5, index, heading)));
             } else if name == "H6" {
-                structure.push(Rc::new(Structure::Heading(6, tex)));
+                structure.push(Rc::new(Structure::Heading(6, index, heading)));
             }
         } else if name == "P" {
             let tex = parse_content_text(tag.value.as_ref())?;
@@ -259,7 +289,23 @@ fn read_articles(article_list: &ParsedList, atypes: &Vec<Rc<ArticleType>>, artic
             let key = tuple.get(0).ok_or(format!("Article key must exist."))?;
             let key = key.as_text().ok_or(format!("Article key must be text."))?;
             let title = tuple.get(1).ok_or(format!("Article title must exist."))?;
-            let title = parse_content_text(title)?;
+            let (index, title) = if title.is_list() {
+                let list = title.as_list().unwrap();
+                if list.len() == 1 {
+                    (None, parse_content_text(title)?)
+                } else if list.len() == 0 {
+                    return Err(format!("Title list cannot be empty."));
+                } else if list.len() == 2 {
+                    let index = list.get_element(0).unwrap();
+                    let index = write_label_index(index)?;
+                    let title = parse_content_text(list.get_element(1).unwrap())?;
+                    (Some(index), title)
+                } else {
+                    return Err(format!("More than 1 title index not yet supported."));
+                }
+            } else {
+                (None, parse_content_text(title)?)
+            };
             let content = if let Some(vvv) = tuple.get(2) {
                 parse_article_content(vvv)?
             } else {
@@ -271,20 +317,25 @@ fn read_articles(article_list: &ParsedList, atypes: &Vec<Rc<ArticleType>>, artic
                 article_type: atype,
                 content,
             });
+            if article_map.contains_key(key.as_str()) {
+                eprintln!("Found duplicate article with key {}.", key.as_str());
+            }
+            article_map.insert(newart.key.clone(), newart.clone());
             articles.push(newart.clone());
+            let label = Label(newart, index);
             if structure.len() > 0 {
                 if matches!(structure.last().unwrap().as_ref(), Structure::Articles(..)) {
                     if let Structure::Articles(mut v) = Rc::into_inner(structure.pop().unwrap()).unwrap() {
-                        v.push(newart);
+                        v.push(label);
                         structure.push(Rc::new(Structure::Articles(v)));
                     } else {
                         unreachable!();
                     }
                 } else {
-                    structure.push(Rc::new(Structure::Articles(vec![newart])));
+                    structure.push(Rc::new(Structure::Articles(vec![label])));
                 }
             } else {
-                structure.push(Rc::new(Structure::Articles(vec![newart])));
+                structure.push(Rc::new(Structure::Articles(vec![label])));
             }
         }
     }
@@ -339,24 +390,49 @@ fn write_content_text(output: &mut String, input: &ParsedValue) -> Result<(), St
         ParsedValue::Tagged(t, _, _) => {
             let name = t.name.as_ref();
             if name == "$" {
-                let tex = write_tex_with(input, BreakMode::Never).or_else(tex_error_to_text)?;
-                output.push('$');
+                let tex = write_tex_with(t.value.as_ref(), BreakMode::Never).or_else(tex_error_to_text)?;
+                output.push('\\');
+                output.push('(');
                 output.push_str(&tex);
-                output.push('$');
+                output.push('\\');
+                output.push(')');
                 Ok(())
             } else if name == "$$" {
-                let tex = write_tex_with(input, BreakMode::Never).or_else(tex_error_to_text)?;
-                output.push('$');
-                output.push('$');
+                let tex = write_tex_with(t.value.as_ref(), BreakMode::Never).or_else(tex_error_to_text)?;
+                output.push('\\');
+                output.push('[');
                 output.push_str(&tex);
-                output.push('$');
-                output.push('$');
+                output.push('\\');
+                output.push(']');
                 Ok(())
             } else if name == "n" {
-                output.push_str("<br>");
+                match t.value.as_ref() {
+                    ParsedValue::Tuple(t, ..) => {
+                        if t.is_empty() {
+                            output.push_str("<br>");
+                        } else if t.len() == 1 {
+                            return Err(format!("<n> command must take 0 or more than 2 arguments. Cannot take just 1."));
+                        } else {
+                            let mut iter = t.iter();
+                            let fv = iter.next().unwrap();
+                            write_content_text(output, fv)?;
+                            for v in iter {
+                                output.push_str("<br>");
+                                write_content_text(output, v)?;
+                            }
+                        }
+                    }
+                    _ => return Err(format!("<n> command must take 0 or more than 2 arguments. Cannot take just 1.")),
+                }
                 Ok(())
             } else if name == "@" {
                 output.push_str("<a>link</a>");
+                Ok(())
+            } else if name == "ol" {
+
+                Ok(())
+            } else if name == "ul" {
+
                 Ok(())
             } else {
                 Err(format!("Unexpected command in content text"))
@@ -369,13 +445,23 @@ fn write_content_text(output: &mut String, input: &ParsedValue) -> Result<(), St
             for c in c.iter() {
                 match c {
                     Element::Element(e) => write_content_text(output, e)?,
-                    Element::Whitespace => output.push_str(" "),
+                    Element::Whitespace => output.push(' '),
                 }
             }
             Ok(())
         }
         ParsedValue::Nil(..) => Ok(()),
     }
+}
+
+fn write_label_index(value: &ParsedValue) -> Result<String, String> {
+    let mut html = String::new();
+    let template = include_str!("../templates/label-index.html");
+    let (p0, p1) = template.split_once("{INDEX}").unwrap();
+    html.push_str(p0);
+    write_content_text(&mut html, value)?;
+    html.push_str(p1);
+    Ok(html)
 }
 
 fn tex_error_to_text<T>(error: PreprocessorError) -> Result<T, String> {
@@ -421,10 +507,28 @@ struct Article {
 }
 
 enum Structure {
-    Heading(u8, String),
+    Heading(u8, Option<String>, String),
     Paragraph(String),
-    Articles(Vec<Rc<Article>>),
+    Articles(Vec<Label>),
 }
+
+/// A progress type.
+/// Only levels are supported.
+struct ProgressType {
+    key: String,
+    levels: Box<[Level]>,
+}
+
+struct Level {
+    key: String,
+    name: String,
+    description: String,
+    icon: String,
+    weight: u8,
+}
+
+/// A label containing an article and optional label index.
+struct Label(Rc<Article>, Option<String>);
 
 enum ArticleContent {
     Heading(u8, String),
@@ -432,29 +536,67 @@ enum ArticleContent {
 }
 
 /// Generate the page.
-fn generate_page(title: &str, articles: &Vec<Rc<Article>>, article_types: &Vec<Rc<ArticleType>>, structure: &Vec<Rc<Structure>>) -> Html {
+fn generate_page(
+    title: &str,
+    articles: &Vec<Rc<Article>>,
+    article_types: &Vec<Rc<ArticleType>>,
+    structure: &Vec<Rc<Structure>>,
+    progress_types: &Vec<ProgressType>,
+    preamble: &Option<String>,
+) -> Html {
     let mut page = String::new();
     let str = include_str!("../templates/template.html");
+    let progress_types = progress_to_json(progress_types);
+    let style = generate_style(article_types);
+    let preamble = match preamble {
+        None => "",
+        Some(s) => s.as_str(),
+    };
+    let overview = generate_overview_tab(structure);
+    let details = generate_details_tab(articles);
     let (p0, p) = str.split_once("{TITLE}").unwrap();
     page.push_str(p0);
     page.push_str(title);
-    let (p1, p) = p.split_once("{STYLE}").unwrap();
+    let (p1, p) = p.split_once("{PROGRESS-TYPES}").unwrap();
     page.push_str(p1);
-    let style = generate_style(article_types);
-    page.push_str(&style);
-    let (p2, p) = p.split_once("{TITLE}").unwrap();
+    page.push_str(&progress_types);
+    let (p2, p) = p.split_once("{STYLE}").unwrap();
     page.push_str(p2);
-    page.push_str(title);
-    let (p3, p) = p.split_once("{OVERVIEW}").unwrap();
+    page.push_str(&style);
+    let (p3, p) = p.split_once("{PREAMBLE}").unwrap();
     page.push_str(p3);
-    let overview = generate_overview_tab(structure);
-    page.push_str(&overview);
-    let (p4, p) = p.split_once("{DETAILS}").unwrap();
+    page.push_str(preamble);
+    let (p4, p) = p.split_once("{TITLE}").unwrap();
     page.push_str(p4);
-    let details = generate_details_tab(articles);
+    page.push_str(title);
+    let (p5, p) = p.split_once("{OVERVIEW}").unwrap();
+    page.push_str(p5);
+    page.push_str(&overview);
+    let (p6, p) = p.split_once("{DETAILS}").unwrap();
+    page.push_str(p6);
     page.push_str(&details);
     page.push_str(p);
     page
+}
+
+fn progress_to_json(progress_types: &Vec<ProgressType>) -> String {
+    let mut json = String::new();
+    json.push('[');
+    for pt in progress_types {
+        json.push('{');
+        json.push_str("key:\"");
+        json.push_str(&pt.key);
+        for level in pt.levels.iter() {
+            //level.key;
+        }
+
+        json.push_str("\",name:\"");
+        //json.push_str(&pt.);
+        json.push_str("\",");
+        json.push('}');
+    }
+    json.push(']');
+    json
 }
 
 /// Generate the styles for the article types.
@@ -477,11 +619,15 @@ fn generate_overview_tab(structure: &Vec<Rc<Structure>>) -> String {
     let mut view = String::new();
     for v in structure {
         match v.as_ref() {
-            Structure::Heading(l, s) => {
-                view.push_str(&format!("<h{l}>{s}</h{l}>"));
+            Structure::Heading(l, i, s) => {
+                if let Some(i) = i {
+                    view.push_str(&format!("<h{l}><span class=\"label-tab-text\">{i}</span> <span class=\"label-tab-text\">{s}</span></h{l}>"));
+                } else {
+                    view.push_str(&format!("<h{l}><span class=\"label-tab-text\">{s}</span></h{l}>"));
+                }
             }
             Structure::Paragraph(p) => {
-                view.push_str(&format!("<p>{p}</p>"));
+                view.push_str(&format!("<p><span class=\"label-tab-text\">{p}</span></p>"));
             }
             Structure::Articles(articles) => {
                 view.push_str(&generate_labels(articles))
@@ -492,11 +638,11 @@ fn generate_overview_tab(structure: &Vec<Rc<Structure>>) -> String {
 }
 
 /// Generate a label box.
-fn generate_labels(articles: &Vec<Rc<Article>>) -> String {
+fn generate_labels(labels: &Vec<Label>) -> String {
     let mut html = String::new();
     html.push_str("<div class=\"labels\">");
-    for article in articles {
-        let h = generate_label(article);
+    for label in labels {
+        let h = generate_label(label);
         html.push_str(&h);
     }
     html.push_str("</div>");
@@ -504,15 +650,23 @@ fn generate_labels(articles: &Vec<Rc<Article>>) -> String {
 }
 
 /// Generate an article label.
-fn generate_label(article: &Article) -> String {
+fn generate_label(label: &Label) -> String {
+    let article = label.0.as_ref();
     let key = &article.key;
+    let cind = if !article.content.is_empty() {
+        "<div class=\"cind\"></div>"
+    } else {
+        ""
+    };
     let atype = &article.article_type.name;
     let title = &article.title;
+    let s = String::from("");
+    let index = label.1.as_ref().unwrap_or(&s);
     format!(r#"
         <div article-key="{key}" class="label">
           <div class="progress"></div>
-          <div class="header {atype}-label">{title}</div>
-        </div>
+          <div class="{atype}-label header">{index}<span class="label-title">{title}</span></div>
+        {cind}</div>
     "#).into()
 }
 
@@ -553,9 +707,13 @@ fn generate_article_content(content: &Vec<ArticleContent>) -> String {
                 html.push_str(&format!("<h{l}>{h}</h{l}>"));
             }
             ArticleContent::Paragraph(p) => {
-                html.push_str(&format!("<p>{p}</p>"))
+                html.push_str(&format!("<p>{p}</p>"));
             }
         }
     }
     html
 }
+
+
+
+

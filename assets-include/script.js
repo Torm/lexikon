@@ -1,21 +1,70 @@
 
+/**
+ * The collection of currently opened articles.
+ */
 let openArticles = new Set();
 
+/**
+ * Always incremented when opening an article. Used to order last opened article
+ * last.
+ */
 let index = 0;
 
+/**
+ * The progress stored for each article. Should be persisted.
+ */
+let progress = new Map();
 
-let progresses = new Map();
-
-// Key of last clicked article or label.
+/**
+ * Key of last clicked article. Used to store the subject of a context menu.
+ */
 let lastClickedKey = null;
 
-let highlightMode = "all";
+/**
+ * The progress types found in this document.
+ */
+let progressTypes = new Map();
 
 class Level {
+    constructor(key, name, description, icon) {
+        this.key = key;
+        this.name = name;
+        this.description = description;
+        this.icon = icon;
+    }
+}
+
+/**
+ * Read the article types, progress types and articles from data.
+ */
+function readData() {
 
 }
 
-class Progress {
+class Article {
+    constructor(key, type, label, article) {
+        this.key = key;
+        this.type = type;
+        this.label = label;
+        this.article = article;
+    }
+}
+
+class ArticleType {
+
+}
+
+/**
+ * A progress type. Currently only Level progress types are supported.
+ */
+class LevelProgressType {
+    constructor(key, levels) {
+        this.key = key;
+        this.levels = levels;
+    }
+}
+
+class ProgressState {
     constructor(level) {
         this.level = level;
         this.log = [];
@@ -36,16 +85,16 @@ class ProgressLogEntry {
 
 function setProgress(key, levelstr, timestamp) {
     let level = Number(levelstr);
-    let progresst = progresses.get(key);
+    let progresst = progress.get(key);
     if (progresst === undefined) {
-        progresst = new Progress(level);
-        progresses.set(key, progresst);
+        progresst = new ProgressState(level);
+        progress.set(key, progresst);
     } else {
         progresst.level = level;
     }
     let logEntry = new ProgressLogEntry(timestamp, level);
     progresst.log.push(logEntry);
-    console.log(key, level);
+    localStorage.setItem("progress", JSON.stringify(Array.from(progress.entries())));
     let labels = document.getElementsByClassName("label");
     for (let label of labels) {
         if (key !== label.getAttribute("article-key")) {
@@ -119,6 +168,81 @@ function setProgress(key, levelstr, timestamp) {
 
 }
 
+function updateProgress() {
+    let labels = document.getElementsByClassName("label");
+    for (let label of labels) {
+        let key = label.getAttribute("article-key");
+        let p = progress.get(key);
+        if (p === undefined) continue;
+        let level = p.level;
+        for (let child of label.children) {
+            if (!child.classList.contains("progress")) {
+                continue;
+            }
+
+            //// TODO
+            child.classList.remove("level1", "level2", "level3", "level4", "level5");
+            if (level === 0) {
+
+            } else if (level === 1) {
+                child.classList.add("level1");
+            } else if (level === 2) {
+                child.classList.add("level2");
+            } else if (level === 3) {
+                child.classList.add("level3");
+            } else if (level === 4) {
+                child.classList.add("level4");
+            } else if (level === 5) {
+                child.classList.add("level5");
+            }
+
+            if (level === 5) {
+                child.classList.add("progress-completed");
+            } else {
+                child.classList.remove("progress-completed");
+            }
+
+            ////
+
+        }
+    }
+
+    let articles = document.getElementsByClassName("article");
+    for (let article of articles) {
+        let key = article.getAttribute("article-key");
+        let p = progress.get(key);
+        if (p === undefined) continue;
+        let level = p.level;
+        for (let child of article.children) {
+            if (!child.classList.contains("content")) {
+                continue;
+            }
+            for (let child2 of child.children) {
+                if (!child2.classList.contains("progress-box")) {
+                    continue;
+                }
+
+                //// TODO
+                if (level === 0) {
+                    child.classList.remove("level1", "level2", "level3", "level4", "level5");
+                } else if (level === 1) {
+                    child.classList.add("level1");
+                } else if (level === 2) {
+                    child.classList.add("level2");
+                } else if (level === 3) {
+                    child.classList.add("level3");
+                } else if (level === 4) {
+                    child.classList.add("level4");
+                } else if (level === 5) {
+                    child.classList.add("level5");
+                }
+                ////
+
+            }
+        }
+    }
+}
+
 function openArticle(key) {
     openArticles.add(key);
     let labels = document.getElementsByClassName("label");
@@ -183,6 +307,15 @@ function toggleArticleExpand(key) {
 
 document.addEventListener("DOMContentLoaded", event => {
 
+    // Check localstorage progress
+    let progressStored = localStorage.getItem("progress");
+    if (progressStored !== null) {
+        progress = new Map(JSON.parse(progressStored));
+        updateProgress();
+    } else {
+        progress = new Map();
+    }
+
     document.getElementById("article-view-button").addEventListener("click", event => {
         document.getElementById("main").classList.remove("main-overview");
         document.getElementById("main").classList.add("main-details");
@@ -220,7 +353,7 @@ document.addEventListener("DOMContentLoaded", event => {
         let now = Date.now();
         for (let label of labels) {
             let key = label.getAttribute("article-key");
-            let progress = progresses.get(key);
+            let progress = progress.get(key);
             let last = progress !== undefined ? progress.log[progress.log.length - 1] : undefined;
             let timestamp = null;
             if (last !== undefined) timestamp = last.timestamp;
@@ -238,7 +371,7 @@ document.addEventListener("DOMContentLoaded", event => {
 
         for (let label of labels) {
             let key = label.getAttribute("article-key");
-            let progress = progresses.get(key);
+            let progress = progress.get(key);
             if (progress !== undefined && progress.level === 5) {
                 label.classList.add("lowlighted-label");
             } else {
@@ -253,7 +386,6 @@ document.addEventListener("DOMContentLoaded", event => {
         label.addEventListener("click", event => {
             let label = event.currentTarget;
             let key = label.getAttribute("article-key");
-            console.log(key);
             if (openArticles.has(key)) {
                 closeArticle(key);
             } else {
@@ -269,7 +401,6 @@ document.addEventListener("DOMContentLoaded", event => {
             let label = event.currentTarget;
             let key = label.getAttribute("article-key");
             lastClickedKey = key;
-            console.log(getSelection().type);
             if (getSelection().type === "Range") {
                 return;
             }
@@ -317,10 +448,10 @@ document.addEventListener("DOMContentLoaded", event => {
     function fillProgressLog(key) {
         let log = document.getElementById("progress-log");
         log.replaceChildren();
-        let articleProgress = progresses.get(key);
+        let articleProgress = progress.get(key);
         if (articleProgress !== undefined) {
             for (let entry of articleProgress.log) {
-                let timestamp = entry.timestamp;
+                let timestamp = new Date(entry.timestamp);
                 let level = entry.level;
                 let timestr = timestamp.getFullYear();
                 timestr += "-";
@@ -363,7 +494,6 @@ document.addEventListener("DOMContentLoaded", event => {
     let progressBoxes = document.getElementsByClassName("progress-box");
     for (let box of progressBoxes) {
         box.addEventListener("contextmenu", event => {
-            console.log(getSelection().type);
             if (getSelection().type === "Range") {
                 return;
             }
