@@ -7,6 +7,7 @@ use std::rc::Rc;
 use include_dir::include_dir;
 use khi::{Compound, Dictionary, Element, List, Tagged, Text, Tuple, Value};
 use khi::parse::parse_dictionary_str;
+use khi::parse::parser::error_to_string;
 use khi::pdm::{ParsedDictionary, ParsedList, ParsedValue};
 use khi::tex::{BreakMode, PreprocessorError, write_tex_with};
 use zeroarg::{Argument, parse_arguments};
@@ -133,12 +134,12 @@ fn parse_file(
         return Err(format!("Error reading file {file_name}."));
     };
     let parse = parse_dictionary_str(&contents);
-    if let Err(_errs) = parse {
+    if let Err(errs) = parse {
         let mut errors = String::new();
         errors.push_str(&format!("Error parsing file {file_name}:\n\n"));
-        // for err in errs { //todo
-        //     errors.push_str(&format!("{err}\n"));
-        // }
+        for err in errs { //todo
+            errors.push_str(&format!("{}\n", error_to_string(&err)));
+        }
         return Err(errors);
     }
     let parse = parse.unwrap();
@@ -186,7 +187,7 @@ fn parse_file(
     *preamble = if let Some(preamble) = parse.get("Preamble") {
         let tex = match write_tex_with(preamble, BreakMode::Never) {
             Ok(t) => t,
-            Err(_) => return Err(String::from("Preamble preprocessor error.")),
+            Err(err) => return Err(tex_error_to_text(err)?),
         };
         Some(tex)
     } else {
@@ -204,7 +205,7 @@ fn parse_file(
 
 fn unwrap_text(value: &ParsedValue) -> Result<&str, String> {
     if !value.is_text() {
-        return Err("Not a string.".into());
+        return Err(format!("Value at {}:{} is not a string.", value.from().line, value.from().column));
     }
     Ok(value.as_text().unwrap().as_str())
 }
@@ -215,7 +216,7 @@ fn read_types(types: &ParsedDictionary) -> Result<Vec<Rc<ArticleType>>, String> 
     for (ak, av) in types.iter() {
         let name = ak;
         if !av.is_dictionary() {
-            eprintln!("The type \"{ak}\" must be a dictionary.");
+            eprintln!("The type \"{ak}\" at {}:{} must be a dictionary.", av.from().line, av.from().column);
         }
         let d = av.as_dictionary().unwrap();
         let colour = if let Some(c) = d.get("Colour") {
@@ -239,7 +240,7 @@ fn read_articles(article_list: &ParsedList, atypes: &Vec<Rc<ArticleType>>, artic
 
     for article in article_list.iter() {
         if !article.is_tagged() {
-            return Err(format!("Element of Articles section must be a tagged value"));
+            return Err(format!("Element of Articles section at {}:{} must be a tagged value", article.from().line, article.from().column));
         }
         let tag = article.as_tagged().unwrap();
         let name = tag.name.as_ref();
@@ -248,7 +249,7 @@ fn read_articles(article_list: &ParsedList, atypes: &Vec<Rc<ArticleType>>, artic
             let (index, heading) = if value.is_tuple() {
                 let value = value.as_tuple().unwrap();
                 if value.len() != 2 {
-                    return Err(String::from("Heading must be tuple with 1 or 2 elements."));
+                    return Err(format!("Heading at {}:{} must be tuple with 1 or 2 elements.", tag.value.from().line, tag.value.from().column));
                 }
                 (Some(parse_content_text(value.get(0).unwrap())?), parse_content_text(value.get(1).unwrap())?)
             } else {
@@ -272,53 +273,63 @@ fn read_articles(article_list: &ParsedList, atypes: &Vec<Rc<ArticleType>>, artic
             structure.push(Rc::new(Structure::Paragraph(tex)));
         } else {
             let mut atype = None;
-            let tname = tag.name.as_ref();
+            let mut tname = tag.name.as_ref();
+            let opt = if tname.ends_with('\'') {
+                tname = &tname[0 .. tname.len() - 1];
+                true
+            } else {
+                false
+            };
             for t in atypes {
                 if tname == t.name {
                     atype = Some(t);
                 }
             }
             if atype.is_none() {
-                return Err(format!("Article type {tname} does not exist."));
+                return Err(format!("Article type {tname} at {}:{} does not exist.", article.from().line, article.from().column));
             }
             let atype = atype.unwrap().clone();
-            if !tag.value.is_tuple() {
-                return Err(format!("Article must be a tuple."));
+            if tag.attributes.len() != 1 {
+                return Err(format!("Article at {}:{} must have a single key attribute.", article.from().line, article.from().column));
             }
-            let tuple = tag.value.as_tuple().unwrap();
-            let key = tuple.get(0).ok_or(format!("Article key must exist."))?;
-            let key = key.as_text().ok_or(format!("Article key must be text."))?;
-            let title = tuple.get(1).ok_or(format!("Article title must exist."))?;
-            let (index, title) = if title.is_list() {
-                let list = title.as_list().unwrap();
-                if list.len() == 1 {
-                    (None, parse_content_text(title)?)
-                } else if list.len() == 0 {
-                    return Err(format!("Title list cannot be empty."));
-                } else if list.len() == 2 {
-                    let index = list.get_element(0).unwrap();
-                    let index = write_label_index(index)?;
-                    let title = parse_content_text(list.get_element(1).unwrap())?;
-                    (Some(index), title)
+            let keyattr = tag.attributes.get(0).unwrap();
+            let key = if keyattr.0.as_ref() == "key" || keyattr.0.as_ref() == "k" {
+                if let Some(key) = &keyattr.1 {
+                    key.as_ref()
                 } else {
-                    return Err(format!("More than 1 title index not yet supported."));
+                    return Err(format!("Key attribute in article at {}:{} does not have a value.", article.from().line, article.from().column));
                 }
             } else {
-                (None, parse_content_text(title)?)
+                return Err(format!("Unknown attribute {} in article at {}:{}.", keyattr.0.as_ref(), article.from().line, article.from().column));
             };
-            let content = if let Some(vvv) = tuple.get(2) {
+            let mut argiter = tag.value.iter_as_tuple();
+            let index = if opt {
+                if let Some(index) = argiter.next() {
+                    Some(write_label_index(index)?)
+                } else {
+                    return Err(format!("Article at {}:{} is indicated to have an optional argument but none was found. Please specify the index optional argument.", article.from().line, article.from().column));
+                }
+            } else {
+                None
+            };
+            let title = argiter.next().ok_or(format!("Article at {}:{} must have a title argument.", article.from().line, article.from().column))?;
+            let title = parse_content_text(title)?;
+            let content = if let Some(vvv) = argiter.next() {
                 parse_article_content(vvv)?
             } else {
                 vec![]
             };
+            if let Some(vvvv) = argiter.next() {
+                return Err(format!("Found unexpected argument at {}:{}.", vvvv.from().line, vvvv.from().column));
+            }
             let newart = Rc::new(Article {
-                key: key.as_str().into(),
+                key: key.into(),
                 title,
                 article_type: atype,
                 content,
             });
-            if article_map.contains_key(key.as_str()) {
-                eprintln!("Found duplicate article with key {}.", key.as_str());
+            if article_map.contains_key(key) {
+                eprintln!("Found duplicate article keys {}.", key);
             }
             article_map.insert(newart.key.clone(), newart.clone());
             articles.push(newart.clone());
@@ -348,7 +359,7 @@ fn parse_article_content(input: &ParsedValue) -> Result<Vec<ArticleContent>, Str
         let content = input.as_list().unwrap();
         for c in content.iter() {
             if !c.is_tagged() {
-                return Err(format!("Element of article content must be a tagged value"));
+                return Err(format!("Element of article content list at {}:{} must be a tagged value", c.from().line, c.from().column));
             }
             let tag = c.as_tagged().unwrap();
             let name = tag.name.as_ref();
@@ -368,7 +379,7 @@ fn parse_article_content(input: &ParsedValue) -> Result<Vec<ArticleContent>, Str
             } else if name == "P" {
                 article_elements.push(ArticleContent::Paragraph(tex));
             } else {
-                return Err(format!("Element of article content must be a heading or paragraph."));
+                return Err(format!("Element of article content list at {}:{} must be a heading or paragraph.", c.from().line, c.from().column));
             }
         }
     } else {
@@ -411,7 +422,7 @@ fn write_content_text(output: &mut String, input: &ParsedValue) -> Result<(), St
                         if t.is_empty() {
                             output.push_str("<br>");
                         } else if t.len() == 1 {
-                            return Err(format!("<n> command must take 0 or more than 2 arguments. Cannot take just 1."));
+                            return Err(format!("<n> command at {}:{} must take 0 or more than 2 arguments. Cannot take just 1.", input.from().line, input.from().column));
                         } else {
                             let mut iter = t.iter();
                             let fv = iter.next().unwrap();
@@ -422,7 +433,7 @@ fn write_content_text(output: &mut String, input: &ParsedValue) -> Result<(), St
                             }
                         }
                     }
-                    _ => return Err(format!("<n> command must take 0 or more than 2 arguments. Cannot take just 1.")),
+                    _ => return Err(format!("<n> command at {}:{} must take 0 or more than 2 arguments. Cannot take just 1.", t.value.from().line, t.value.from().column)),
                 }
                 Ok(())
             } else if name == "@" {
@@ -435,12 +446,12 @@ fn write_content_text(output: &mut String, input: &ParsedValue) -> Result<(), St
 
                 Ok(())
             } else {
-                Err(format!("Unexpected command in content text"))
+                Err(format!("Unexpected command in content text at {}:{}.", input.from().line, input.from().column))
             }
         }
-        ParsedValue::Tuple(_, _, _) => return Err(format!("Unexpected tuple in content text")),
-        ParsedValue::Dictionary(_, _, _) => return Err(format!("Unexpected dictionary in content text")),
-        ParsedValue::List(_, _, _) => return Err(format!("Unexpected list in content text")),
+        ParsedValue::Tuple(_, _, _) => return Err(format!("Unexpected tuple in content text at {}:{}.", input.from().line, input.from().column)),
+        ParsedValue::Dictionary(_, _, _) => return Err(format!("Unexpected dictionary in content text at {}:{}.", input.from().line, input.from().column)),
+        ParsedValue::List(_, _, _) => return Err(format!("Unexpected list in content text at {}:{}.", input.from().line, input.from().column)),
         ParsedValue::Compound(c, _, _) => {
             for c in c.iter() {
                 match c {
@@ -465,7 +476,15 @@ fn write_label_index(value: &ParsedValue) -> Result<String, String> {
 }
 
 fn tex_error_to_text<T>(error: PreprocessorError) -> Result<T, String> {
-    Err("TeX error".into())
+    let err = match error {
+        PreprocessorError::IllegalTable(p) => format!("TeX: Illegal list at {}:{}.", p.line, p.column),
+        PreprocessorError::IllegalDictionary(p) => format!("TeX: Illegal dictionary at {}:{}.", p.line, p.column),
+        PreprocessorError::IllegalTuple(p) => format!("TeX: Illegal tuple at {}:{}.", p.line, p.column),
+        PreprocessorError::ZeroTable(p) => format!("TeX: Empty table at {}:{}.", p.line, p.column),
+        PreprocessorError::MacroError(p, e) => format!("TeX: Macro error at {}:{}:\n{}", p.line, p.column, &e),
+        PreprocessorError::MissingOptionalArgument(p) => format!("TeX: Missing optional argument at {}:{}.", p.line, p.column),
+    };
+    Err(err)
 }
 
 fn decode_colour(value: &ParsedValue) -> Result<String, String> {
@@ -476,10 +495,10 @@ fn decode_colour(value: &ParsedValue) -> Result<String, String> {
             if let Some(c) = premade_colour(name) {
                 Ok(c.into())
             } else {
-                Err(format!("{name} is not a valid colour."))
+                Err(format!("{name} at {}:{} is not a valid colour.", value.from().line, value.from().column))
             }
         }
-        _ => Err(format!("Colour must be text or a tagged value."))
+        _ => Err(format!("Colour value at {}:{} must be text or a tagged value.", value.from().line, value.from().column))
     }
 }
 
