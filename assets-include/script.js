@@ -141,24 +141,24 @@ function setProgress(key, levelstr, timestamp) {
             if (!child.classList.contains("content")) {
                 continue;
             }
-            for (let child2 of child.children) {
-                if (!child2.classList.contains("progress-box")) {
+            for (let child of child.children) {
+                if (!child.classList.contains("progress-box")) {
                     continue;
                 }
-
+                let child2 = child.getElementsByClassName("progress")[0];
                 //// TODO
                 if (level === 0) {
-                    child.classList.remove("level1", "level2", "level3", "level4", "level5");
+                    child2.classList.remove("level1", "level2", "level3", "level4", "level5");
                 } else if (level === 1) {
-                    child.classList.add("level1");
+                    child2.classList.add("level1");
                 } else if (level === 2) {
-                    child.classList.add("level2");
+                    child2.classList.add("level2");
                 } else if (level === 3) {
-                    child.classList.add("level3");
+                    child2.classList.add("level3");
                 } else if (level === 4) {
-                    child.classList.add("level4");
+                    child2.classList.add("level4");
                 } else if (level === 5) {
-                    child.classList.add("level5");
+                    child2.classList.add("level5");
                 }
                 ////
 
@@ -176,30 +176,30 @@ function updateProgress() {
         if (p === undefined) continue;
         let level = p.level;
         for (let child of label.children) {
-            if (!child.classList.contains("progress")) {
+            if (!child.classList.contains("progress-box")) {
                 continue;
             }
-
+            let child2 = child.getElementsByClassName("progress")[0];
             //// TODO
-            child.classList.remove("level1", "level2", "level3", "level4", "level5");
+            child2.classList.remove("level1", "level2", "level3", "level4", "level5");
             if (level === 0) {
 
             } else if (level === 1) {
-                child.classList.add("level1");
+                child2.classList.add("level1");
             } else if (level === 2) {
-                child.classList.add("level2");
+                child2.classList.add("level2");
             } else if (level === 3) {
-                child.classList.add("level3");
+                child2.classList.add("level3");
             } else if (level === 4) {
-                child.classList.add("level4");
+                child2.classList.add("level4");
             } else if (level === 5) {
-                child.classList.add("level5");
+                child2.classList.add("level5");
             }
 
             if (level === 5) {
-                child.classList.add("progress-completed");
+                child2.classList.add("progress-completed");
             } else {
-                child.classList.remove("progress-completed");
+                child2.classList.remove("progress-completed");
             }
 
             ////
@@ -214,27 +214,27 @@ function updateProgress() {
         if (p === undefined) continue;
         let level = p.level;
         for (let child of article.children) {
-            if (!child.classList.contains("content")) {
+            if (!child.classList.contains("menu")) {
                 continue;
             }
-            for (let child2 of child.children) {
-                if (!child2.classList.contains("progress-box")) {
+            for (let childh of child.children) {
+                if (!childh.classList.contains("progress-box")) {
                     continue;
                 }
-
+                let child2 = childh.getElementsByClassName("progress")[0];
                 //// TODO
                 if (level === 0) {
-                    child.classList.remove("level1", "level2", "level3", "level4", "level5");
+                    child2.classList.remove("level1", "level2", "level3", "level4", "level5");
                 } else if (level === 1) {
-                    child.classList.add("level1");
+                    child2.classList.add("level1");
                 } else if (level === 2) {
-                    child.classList.add("level2");
+                    child2.classList.add("level2");
                 } else if (level === 3) {
-                    child.classList.add("level3");
+                    child2.classList.add("level3");
                 } else if (level === 4) {
-                    child.classList.add("level4");
+                    child2.classList.add("level4");
                 } else if (level === 5) {
-                    child.classList.add("level5");
+                    child2.classList.add("level5");
                 }
                 ////
 

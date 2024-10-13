@@ -115,23 +115,18 @@ footer {
 }
 
 .label {
-//display: inline block;
-//border: 2px #1c1c1c solid;
-//border: 2px green solid;
 //background: linear-gradient(0deg, rgba(55,149,45,1) 0%, rgba(0,0,0,0) 100%);
-    background-color: #111111;
-    margin: 0.25em;
-    display: inline grid;
+    background-color: #000000;
+    margin: 0.25rem 0.25rem;
+    display: inline flex;
     grid-template-areas: "checkbox header";
-    grid-gap: 1px;
+    //grid-gap: 1px;
     font-family: "Liberation Serif", serif;
     font-size: 12px;
-    border: 1px solid #222222;
-//border-left: 1px solid #111111;
-//border-right: 1px solid #111111;
-//border-top: 1px solid #111111;
+    border: 1px solid #000000;
     cursor: pointer;
     position: relative;
+    gap: 1px;
 }
 
 .label:hover {
@@ -139,6 +134,7 @@ footer {
 }
 
 .label > .header {
+    position: relative;
     grid-area: header;
     height: 19px;
     //background-color: #353535;
@@ -147,7 +143,6 @@ footer {
     font-family: "Liberation Sans", serif;
     font-size: 12px;
     font-weight: bold;
-//background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,255,0,25%) 100%);
 }
 
 .label > .cind {
@@ -160,15 +155,18 @@ footer {
     top: 0;
 }
 
-.label > .progress {
-    grid-area: checkbox;
-    height: 19px;
-    width: 19px;
+.label-text {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(0, 0, 0, 0) 75%);
 }
 
 .label-title {
+    display: block;
     margin-left: 4px;
     margin-right: 4px;
+    height: fit-content;
 }
 
 #label-view-button {
@@ -181,15 +179,27 @@ footer {
     background-image: url("button-details-w.png");
 }
 
-.progress {
-    //background-color: #4a4a4a;
-    background-color: #404040;
+.progress-box {
     font-weight: bolder;
     font-size: 15px;
     user-select: none;
     display: flow;
     text-align: center;
-    //filter: saturate(0%) brightness(80%);
+    background: repeating-linear-gradient(
+            -45deg,
+            #424242,
+            #424242 3px,
+            #303030 3px,
+            #303030 6px
+    );
+    grid-area: checkbox;
+    height: 19px;
+    width: 19px;
+}
+
+.progress {
+    height: 19px;
+    width: 19px;
 }
 
 .progress-completed {
@@ -354,6 +364,25 @@ footer {
     gap: 0.5em;
 }
 
+.label-atl {
+    position: absolute;
+    display: flex;
+    margin: 0;
+    padding: 0 1px;
+    //height: 6px;
+    left:0;
+    top: -8px;
+    font-size: 7px;
+    font-weight: lighter;
+    font-family: sans-serif;
+    z-index: 5;
+    color: #717171;
+    justify-content: center;
+    align-content: center;
+    text-align: center;
+    user-select: none;
+}
+
 .progress-box {
     display: inline-block;
     min-height: 19px;
@@ -389,12 +418,18 @@ footer {
     align-content: flex-start;
     vertical-align: top;
     row-gap: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.5), rgba(253, 253, 253, 0));
 }
 
 .opened-label {
     border: 1px solid #ffffff;
     filter: saturate(50%) brightness(125%);
+    background-color: #ffffff;
 }
+
+/*.opened-label > .label-atl {*/
+/*    border: 1px solid #ffffff;*/
+/*}*/
 
 .opened-label:hover {
     border: 1px solid #efefef;
@@ -418,6 +453,7 @@ footer {
     grid-template-areas: "selection" "log";
     color: #eeeeee;
     gap: 2px;
+    z-index: 10;
 }
 
 #progress-select {
@@ -583,19 +619,20 @@ footer {
 }
 
 .label-index {
-    height: 100%;
+    //height: 100%;
     margin: 0;
-    padding: 0 2px;
-    border-right: 1px solid rgba(0, 0, 0, 0.5);
+    padding: 0 1px;
     font-size: 9px;
     font-family: sans-serif;
     line-height: 100%;
     text-align: center;
-    color: rgb(255, 255, 255);
+    color: rgb(204, 203, 191);
     font-weight: lighter;
     user-select: none;
-    background-color: rgba(0, 0, 0, 0.33);
+    background-color: rgba(36, 36, 36, 0.33);
     align-content: center;
+    border-right: 1px solid rgba(0, 0, 0, 0.33);
+    height: 19px;
 }
 .label-index > * {
     margin: 0;

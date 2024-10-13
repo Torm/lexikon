@@ -229,7 +229,17 @@ fn read_types(types: &ParsedDictionary) -> Result<Vec<Rc<ArticleType>>, String> 
         } else {
             "#636363".into()
         };
-        a.push(Rc::new(ArticleType { name: name.into(), colour }))
+        let label = if let Some(l) = d.get("Label") {
+            if !l.is_text() {
+                eprintln!("Error: Label must be text.");
+                continue;
+            };
+            let l = l.as_text().unwrap().as_str();
+            Some(String::from(l))
+        } else {
+            None
+        };
+        a.push(Rc::new(ArticleType { name: name.into(), colour, label }))
     }
 
     Ok(a)
@@ -544,6 +554,7 @@ fn premade_colour(colour: &str) -> Option<&str> {
 struct ArticleType {
     name: String,
     colour: String,
+    label: Option<String>,
 }
 
 struct Article {
@@ -708,13 +719,23 @@ fn generate_label(label: &Label) -> String {
     };
     let atype = &article.article_type.name;
     let title = &article.title;
+    let atl = if let Some(atl) = article.article_type.label.as_ref() {
+        format!("<div class=\"label-atl\"><span>{atl}</span></div>")
+    } else {
+        String::new()
+    };
     let s = String::from("");
     let index = label.1.as_ref().unwrap_or(&s);
     format!(r#"
         <div article-key="{key}" class="label">
-          <div class="progress"></div>
-          <div class="{atype}-label header">{index}<span class="label-title">{title}</span></div>
-        {cind}</div>
+          <div class="progress-box"><div class="progress"></div></div>
+          <div class="{atype}-label header">
+            {index}
+            <div class="label-text"><span class="label-title">{title}</span></div>
+          </div>
+          {atl}
+          {cind}
+        </div>
     "#).into()
 }
 
@@ -730,6 +751,7 @@ fn generate_article(article: &Article) -> String {
     let mut html = String::new();
     let key = &article.key;
     let content = generate_article_content(&article.content);
+    let label = article.article_type.label.as_ref().unwrap_or(&String::from(""));
     let p = include_str!("../templates/article.html");
     let (p0, p) = p.split_once("{KEY}").unwrap();
     html.push_str(p0);
@@ -764,7 +786,3 @@ fn generate_article_content(content: &Vec<ArticleContent>) -> String {
     }
     html
 }
-
-
-
-
