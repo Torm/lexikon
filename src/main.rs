@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use include_dir::include_dir;
 use khi::{Compound, Dictionary, Element, List, Tagged, Text, Tuple, Value};
@@ -363,21 +363,55 @@ fn parse_article_content(input: &ParsedValue) -> Result<Vec<ArticleContent>, Str
             }
             let tag = c.as_tagged().unwrap();
             let name = tag.name.as_ref();
-            let tex = parse_content_text(tag.value.as_ref())?;
             if name == "H1" {
+                let tex = parse_content_text(tag.value.as_ref())?;
                 article_elements.push(ArticleContent::Heading(1, tex));
             } else if name == "H2" {
+                let tex = parse_content_text(tag.value.as_ref())?;
                 article_elements.push(ArticleContent::Heading(2, tex));
             } else if name == "H3" {
+                let tex = parse_content_text(tag.value.as_ref())?;
                 article_elements.push(ArticleContent::Heading(3, tex));
             } else if name == "H4" {
+                let tex = parse_content_text(tag.value.as_ref())?;
                 article_elements.push(ArticleContent::Heading(4, tex));
             } else if name == "H5" {
+                let tex = parse_content_text(tag.value.as_ref())?;
                 article_elements.push(ArticleContent::Heading(5, tex));
             } else if name == "H6" {
+                let tex = parse_content_text(tag.value.as_ref())?;
                 article_elements.push(ArticleContent::Heading(6, tex));
             } else if name == "P" {
+                let tex = parse_content_text(tag.value.as_ref())?;
                 article_elements.push(ArticleContent::Paragraph(tex));
+            } else if name == "$$" {
+                let tex = write_tex_with(tag.value.as_ref(), BreakMode::Never).or_else(tex_error_to_text)?;
+                let tex = format!("\\[{tex}\\]");
+                article_elements.push(ArticleContent::Paragraph(tex));
+            } else if name == "Ol" {
+                if !tag.value.is_list() {
+                    return Err(format!("Expected list at {}:{}.", tag.value.from().line, tag.value.from().column));
+                }
+                let list = tag.value.as_list().unwrap();
+                let mut html = String::new();
+                html.push_str("<ol>");
+                for v in list.iter() {
+                    html.push_str(&format!("<li>{}</li>", parse_content_text(v)?));
+                }
+                html.push_str("</ol>");
+                article_elements.push(ArticleContent::Html(html));
+            } else if name == "Ul" {
+                if !tag.value.is_list() {
+                    return Err(format!("Expected list at {}:{}.", tag.value.from().line, tag.value.from().column));
+                }
+                let list = tag.value.as_list().unwrap();
+                let mut html = String::new();
+                html.push_str("<ul>");
+                for v in list.iter() {
+                    html.push_str(&format!("<li>{}</li>", parse_content_text(v)?));
+                }
+                html.push_str("</ul>");
+                article_elements.push(ArticleContent::Html(html));
             } else {
                 return Err(format!("Element of article content list at {}:{} must be a heading or paragraph.", c.from().line, c.from().column));
             }
@@ -438,12 +472,6 @@ fn write_content_text(output: &mut String, input: &ParsedValue) -> Result<(), St
                 Ok(())
             } else if name == "@" {
                 output.push_str("<a>link</a>");
-                Ok(())
-            } else if name == "ol" {
-
-                Ok(())
-            } else if name == "ul" {
-
                 Ok(())
             } else {
                 Err(format!("Unexpected command in content text at {}:{}.", input.from().line, input.from().column))
@@ -552,6 +580,7 @@ struct Label(Rc<Article>, Option<String>);
 enum ArticleContent {
     Heading(u8, String),
     Paragraph(String),
+    Html(String),
 }
 
 /// Generate the page.
@@ -727,6 +756,9 @@ fn generate_article_content(content: &Vec<ArticleContent>) -> String {
             }
             ArticleContent::Paragraph(p) => {
                 html.push_str(&format!("<p>{p}</p>"));
+            }
+            ArticleContent::Html(h) => {
+                html.push_str(&h);
             }
         }
     }

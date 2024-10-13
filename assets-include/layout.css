@@ -338,7 +338,14 @@ footer {
     margin: 0.025rem;
     padding: 0.25rem 0.5rem;
     width: fit-content;
-//border-left: 2px solid rgba(0, 0, 0, 15%);
+}
+
+.article > .content > ol, .article > .content > ul {
+    background-color: rgba(0, 0, 0, 20%);
+    margin: 0.025rem;
+    padding: 0.25rem 0.5rem;
+    padding-left: 1.5rem;
+    width: fit-content;
 }
 
 .article > .content > .header {
@@ -594,3 +601,8 @@ footer {
     margin: 0;
     padding: 0;
 }
+
+/*!* Reduce MathJax margins. TODO: Fix in some other way? *!*/
+/*mjx-container {*/
+/*    margin: 0.25rem !important;*/
+/*}*/
