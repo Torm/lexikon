@@ -33,16 +33,19 @@ fn main() {
                     file_name = Some(operand);
                 } else {
                     eprintln!("Error: Found another file operand {operand}. Only one directory/file supported.");
+                    return;
                 }
             }
             Argument::Attribute(k, _) => {
                 eprintln!("Error: Attribute {} not supported", &k);
+                return;
             }
             Argument::Flag(flag) => {
                 if flag == "h" || flag == "help" || flag == "?" {
                     help = true;
                 } else {
                     eprintln!("Error: Flag {} not supported", &flag);
+                    return;
                 }
             }
         }
@@ -67,7 +70,10 @@ fn main() {
         eprintln!("Processing file {file_name}.");
         match process_file(&file_name) {
             Ok(_) => {}
-            Err(e) => eprintln!("{}", &e),
+            Err(e) => {
+                eprintln!("{}", &e);
+                return;
+            },
         };
         let mut path = PathBuf::from(file_name);
         path.pop();
@@ -78,7 +84,7 @@ fn main() {
         eprintln!("{file_name} is not a file or directory.");
         return;
     }
-    eprintln!("Finished");
+    eprintln!("Generated page successfully");
 }
 
 fn write_assets(path: &PathBuf) -> Result<(), String> {
@@ -239,7 +245,17 @@ fn read_types(types: &ParsedDictionary) -> Result<Vec<Rc<ArticleType>>, String> 
         } else {
             None
         };
-        a.push(Rc::new(ArticleType { name: name.into(), colour, label }))
+        let symbol = if let Some(s) = d.get("Symbol") {
+            if !s.is_text() {
+                eprintln!("Error: Symbol must be text.");
+                continue;
+            };
+            let s = s.as_text().unwrap().as_str();
+            Some(String::from(s))
+        } else {
+            None
+        };
+        a.push(Rc::new(ArticleType { name: name.into(), colour, label, symbol }))
     }
 
     Ok(a)
@@ -276,7 +292,21 @@ fn read_articles(article_list: &ParsedList, atypes: &Vec<Rc<ArticleType>>, artic
             } else if name == "H5" {
                 structure.push(Rc::new(Structure::Heading(5, index, heading)));
             } else if name == "H6" {
-                structure.push(Rc::new(Structure::Heading(6, index, heading)));
+                let label_heading = Label::Heading(heading, index);
+                if structure.len() > 0 {
+                    if matches!(structure.last().unwrap().as_ref(), Structure::Articles(..)) {
+                        if let Structure::Articles(mut v) = Rc::into_inner(structure.pop().unwrap()).unwrap() {
+                            v.push(label_heading);
+                            structure.push(Rc::new(Structure::Articles(v)));
+                        } else {
+                            unreachable!();
+                        }
+                    } else {
+                        structure.push(Rc::new(Structure::Articles(vec![label_heading])));
+                    }
+                } else {
+                    structure.push(Rc::new(Structure::Articles(vec![label_heading])));
+                }
             }
         } else if name == "P" {
             let tex = parse_content_text(tag.value.as_ref())?;
@@ -343,7 +373,7 @@ fn read_articles(article_list: &ParsedList, atypes: &Vec<Rc<ArticleType>>, artic
             }
             article_map.insert(newart.key.clone(), newart.clone());
             articles.push(newart.clone());
-            let label = Label(newart, index);
+            let label = Label::Article(newart, index);
             if structure.len() > 0 {
                 if matches!(structure.last().unwrap().as_ref(), Structure::Articles(..)) {
                     if let Structure::Articles(mut v) = Rc::into_inner(structure.pop().unwrap()).unwrap() {
@@ -369,7 +399,11 @@ fn parse_article_content(input: &ParsedValue) -> Result<Vec<ArticleContent>, Str
         let content = input.as_list().unwrap();
         for c in content.iter() {
             if !c.is_tagged() {
-                return Err(format!("Element of article content list at {}:{} must be a tagged value", c.from().line, c.from().column));
+                // return Err(format!("Element of article content list at {}:{} must be a tagged value", c.from().line, c.from().column));
+                // TODO: Below is very temporary workaround.
+                let txt = parse_content_text(c)?;
+                article_elements.push(ArticleContent::Paragraph(txt));
+                continue;
             }
             let tag = c.as_tagged().unwrap();
             let name = tag.name.as_ref();
@@ -505,11 +539,11 @@ fn write_content_text(output: &mut String, input: &ParsedValue) -> Result<(), St
 
 fn write_label_index(value: &ParsedValue) -> Result<String, String> {
     let mut html = String::new();
-    let template = include_str!("../templates/label-index.html");
-    let (p0, p1) = template.split_once("{INDEX}").unwrap();
-    html.push_str(p0);
+    //let template = include_str!("../templates/label-index.html");
+    //let (p0, p1) = template.split_once("{INDEX}").unwrap();
+    //html.push_str(p0);
     write_content_text(&mut html, value)?;
-    html.push_str(p1);
+    //html.push_str(p1);
     Ok(html)
 }
 
@@ -555,6 +589,7 @@ struct ArticleType {
     name: String,
     colour: String,
     label: Option<String>,
+    symbol: Option<String>,
 }
 
 struct Article {
@@ -585,8 +620,12 @@ struct Level {
     weight: u8,
 }
 
-/// A label containing an article and optional label index.
-struct Label(Rc<Article>, Option<String>);
+enum Label {
+    /// An inline heading within the labels.
+    Heading(String, Option<String>),
+    /// A label containing an article and optional label index.
+    Article(Rc<Article>, Option<String>),
+}
 
 enum ArticleContent {
     Heading(u8, String),
@@ -664,11 +703,19 @@ fn generate_style(atypes: &Vec<Rc<ArticleType>>) -> String {
     for atype in atypes {
         let name = &atype.name;
         let colour = &atype.colour;
+        let symbol = &atype.symbol;
         style.push_str(&format!(r#"
           .{name}-label {{
             background-color: {colour};
           }}
         "#));
+        if let Some(symbol) = &atype.symbol {
+            style.push_str(&format!(r#"
+              .{name}-symbol {{
+                background-image: url(assets/notarium/{symbol});
+              }}
+        "#));
+        }
     }
     style
 }
@@ -701,40 +748,54 @@ fn generate_labels(labels: &Vec<Label>) -> String {
     let mut html = String::new();
     html.push_str("<div class=\"labels\">");
     for label in labels {
-        let h = generate_label(label);
-        html.push_str(&h);
+        match label {
+            Label::Heading(h, index) => { // TODO: Accessibility: Do not skip heading levels.
+                if let Some(i) = index {
+                    html.push_str(&format!("<h6><span class=\"label-tab-text\">{i}</span> <span class=\"label-tab-text\">{h}</span></h6>"));
+                } else {
+                    html.push_str(&format!("<h6><span class=\"label-tab-text\">{h}</span></h6>"));
+                }
+            }
+            Label::Article(a, o) => {
+                let h = generate_article_label(a, o.as_ref());
+                html.push_str(&h);
+            }
+        }
     }
     html.push_str("</div>");
     html
 }
 
 /// Generate an article label.
-fn generate_label(label: &Label) -> String {
-    let article = label.0.as_ref();
+fn generate_article_label(article: &Article, index: Option<&String>) -> String {
     let key = &article.key;
-    let cind = if !article.content.is_empty() {
+    let content_indicator = if !article.content.is_empty() {
         "<div class=\"cind\"></div>"
     } else {
         ""
     };
     let atype = &article.article_type.name;
     let title = &article.title;
-    let atl = if let Some(atl) = article.article_type.label.as_ref() {
-        format!("<div class=\"label-atl\"><span>{atl}</span></div>")
+    let s = String::from("");
+    let index_overlabel = if let Some(index) = index {
+        format!("<span class=\"label-atl\">{index}</span>")
     } else {
         String::new()
     };
-    let s = String::from("");
-    let index = label.1.as_ref().unwrap_or(&s);
+    let symbol = if let Some(symbol) = &article.article_type.symbol {
+        format!("<div class=\"label-symbol {atype}-symbol\"></div>")
+    } else {
+        String::from("")
+    };
     format!(r#"
-        <div article-key="{key}" class="label">
+        <div article-key="{key}" class="label {atype}-label">
           <div class="progress-box"><div class="progress"></div></div>
-          <div class="{atype}-label header">
-            {index}
+          <div class=" header">
+            {symbol}
             <div class="label-text"><span class="label-title">{title}</span></div>
           </div>
-          {atl}
-          {cind}
+          {index_overlabel}
+          {content_indicator}
         </div>
     "#).into()
 }

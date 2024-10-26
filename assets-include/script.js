@@ -100,36 +100,31 @@ function setProgress(key, levelstr, timestamp) {
         if (key !== label.getAttribute("article-key")) {
             continue;
         }
-        for (let child of label.children) {
-            if (!child.classList.contains("progress")) {
-                continue;
-            }
+        let progressBox = label.getElementsByClassName("progress-box")[0];
+        let progress = progressBox.getElementsByClassName("progress")[0];
 
-            //// TODO
-            child.classList.remove("level1", "level2", "level3", "level4", "level5");
-            if (level === 0) {
+        //// TODO
+        progress.classList.remove("level1", "level2", "level3", "level4", "level5");
+        if (level === 0) {
 
-            } else if (level === 1) {
-                child.classList.add("level1");
-            } else if (level === 2) {
-                child.classList.add("level2");
-            } else if (level === 3) {
-                child.classList.add("level3");
-            } else if (level === 4) {
-                child.classList.add("level4");
-            } else if (level === 5) {
-                child.classList.add("level5");
-            }
-
-            if (level === 5) {
-                child.classList.add("progress-completed");
-            } else {
-                child.classList.remove("progress-completed");
-            }
-
-            ////
-
+        } else if (level === 1) {
+            progress.classList.add("level1");
+        } else if (level === 2) {
+            progress.classList.add("level2");
+        } else if (level === 3) {
+            progress.classList.add("level3");
+        } else if (level === 4) {
+            progress.classList.add("level4");
+        } else if (level === 5) {
+            progress.classList.add("level5");
         }
+
+        if (level === 5) {
+            progress.classList.add("progress-completed");
+        } else {
+            progress.classList.remove("progress-completed");
+        }
+
     }
 
     let articles = document.getElementsByClassName("article");
@@ -141,11 +136,11 @@ function setProgress(key, levelstr, timestamp) {
             if (!child.classList.contains("content")) {
                 continue;
             }
-            for (let child of child.children) {
-                if (!child.classList.contains("progress-box")) {
+            for (let child3 of child.children) {
+                if (!child3.classList.contains("progress-box")) {
                     continue;
                 }
-                let child2 = child.getElementsByClassName("progress")[0];
+                let child2 = child3.getElementsByClassName("progress")[0];
                 //// TODO
                 if (level === 0) {
                     child2.classList.remove("level1", "level2", "level3", "level4", "level5");

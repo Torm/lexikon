@@ -61,13 +61,6 @@ footer {
     //width: 36px;
 }
 
-#label-tab h1, #label-tab h2, #label-tab h3, #label-tab h4, #label-tab h5, #label-tab h6, #label-tab p {
-    margin: 0.5rem 1rem;
-    padding: 0;
-    font-family: sans-serif;
-    width: fit-content;
-}
-
 #label-tab {
     grid-area: labels;
     background-color: #333333;
@@ -100,6 +93,13 @@ footer {
     //border-left: 2px solid rgba(0, 0, 0, 15%);
 }
 
+#label-tab > h1, #label-tab > h2, #label-tab > h3, #label-tab > h4, #label-tab > h5, #label-tab > h6, #label-tab > p {
+    margin: 0.5rem 1rem;
+    padding: 0;
+    font-family: sans-serif;
+    width: fit-content;
+}
+
 .labels {
     display: flex;
     flex-direction: row;
@@ -112,6 +112,22 @@ footer {
     background-color: rgba(0, 0, 0, 15%);
     width: fit-content;
     //border-left: 2px solid rgba(0, 0, 0, 15%);
+}
+
+.labels > h6 {
+    display: inline flex;
+    border: 1px solid #000000;
+    margin: 0.25rem;
+    height: 19px;
+    align-items: center;
+}
+.labels > h6 > .label-tab-text {
+    background-color: rgba(0, 0, 0, 0.0);
+    //height: 19px;
+    font-size: 11px;
+    font-weight: bold;
+    //margin: 0;
+    //padding: 0;
 }
 
 .label {
@@ -134,6 +150,7 @@ footer {
 }
 
 .label > .header {
+    --label-header-spacing: 3px;
     position: relative;
     grid-area: header;
     height: 19px;
@@ -143,6 +160,10 @@ footer {
     font-family: "Liberation Sans", serif;
     font-size: 12px;
     font-weight: bold;
+    gap: var(--label-header-spacing);
+    padding-left: var(--label-header-spacing);
+    padding-right: var(--label-header-spacing);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(0, 0, 0, 0) 50%);
 }
 
 .label > .cind {
@@ -159,13 +180,13 @@ footer {
     height: 100%;
     display: flex;
     align-items: center;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(0, 0, 0, 0) 75%);
+    //margin: 0 4px;
 }
 
 .label-title {
     display: block;
-    margin-left: 4px;
-    margin-right: 4px;
+    //margin-left: 4px;
+    //margin-right: 4px;
     height: fit-content;
 }
 
@@ -368,19 +389,29 @@ footer {
     position: absolute;
     display: flex;
     margin: 0;
-    padding: 0 1px;
+    padding: 0;
     //height: 6px;
-    left:0;
-    top: -8px;
-    font-size: 7px;
+    left: -1px;
+    top: -10px;
+    font-size: 9px;
     font-weight: lighter;
     font-family: sans-serif;
     z-index: 5;
-    color: #717171;
+    color: #727272;
     justify-content: center;
     align-content: center;
     text-align: center;
     user-select: none;
+}
+
+.label-symbol {
+    width: 12px;
+    height: 12px;
+    //margin: 0 4px;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-blend-mode: soft-light;
 }
 
 .progress-box {
