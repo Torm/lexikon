@@ -1,23 +1,53 @@
 # Todo
 
-- [ ] Arrange labels by section, tags, type
-- [X] Open & close all articles: makes searching easier
-- [ ] Highlighting
-- [ ] Review system
-- [X] KhiTeX to LaTeX / MathJax support
-- [ ] Markup functions: lists, tables, bold font etc.
-- [ ] Progress system (partially done: Complete / Incomplete system implemented)
-- [ ] Review highlighting
-- [ ] Predefined colours (a few implemented currently)
-- [ ] Icons (partially done)
-- [X] Duplicate key warning
-- [ ] Duplicate key article tabs
-- [ ] Heading progress box, showing aggregate score of subsection
-- [ ] Label index
-- [X] Error reporting
+- [X] Classes - article equivalence classes
+- [X] Type model - class type system, constraints and properties
+- [X] Class linking - links between classes
+- [X] project.khi - Project file
+- [X] /documents - Document source directory
+- [X] dir.khi - Directory properties
+- [X] model.json - Describes the data model to the client
+- [X] model.css - Styling links & articles depending on article type
+- [X] /website - Compilation output
+- [ ] Class HTML files
+- [X] Duplicate & existence errors on article, type and link keys
+- [X] Article type mismatch checking
 - [ ] Multiple errors reporting
+- [ ] Internal macros - fully expand TeX (do not use /newcommand).
+- [X] Resolution path for articles - priority of articles to show first
+- [X] Local only articles - use arbitrary or random class name
+- [ ] High-priority article - Default if none was resolved, shown first in class page, etc.
+- [X] Key declaration in article declaration, global & local & both
+- [X] Includes - Link to already declared articles
+- [ ] Aliases/redeclare - Declare an article which points to another article
+- [ ] Include & alias class keys
+- [ ] Markup functions: lists, tables, bold font etc.
+- [ ] Project preamble - Declare project-wide commands
+- [ ] Document preamble
+- [ ] Highlighting
+- [ ] Review system & highlighting
+- [ ] Progress system
+- [ ] On hover, highlight same-class or article links and articles
+- [ ] Click (active) CSS style on buttons
+- [ ] Type icons/symbols
+- [ ] Dynamically generate progress dialog
+- [X] Static & dynamic tooltip system - On hover/unhover, static are shown/hidden, dynamic are generated/deleted
+- [ ] Structured data - for search engines, semantics. Fx. JSON-LD
+- [ ] Error handling of retrieving class files
+- [ ] Arrange links by section, tags, type
+- [ ] Link content indicator
+- [ ] Link panel index sections
+- [ ] Heading progress box, showing aggregate score of subsection
+- [X] Abbreviation - Display type abbreviation on links
+- [X] Article layout, buttons, header, content, links
+- [X] Article class dialog - Show articles in same class
+- [X] Article link panel
+- [X] Link loading - Load links when user expands link panel
+- [ ] Style articles based on type
+- [ ] Dynamically generate article buttons - dependent on user config
+- [X] Newly opened style - Highlight article to see easier which article was opened by user
+- [ ] Article panel links should have regular link style?
+- [X] Open article panel links in reverse order below
+- [ ] Open article panel links in order below article
+- [ ] Autoscroll on opening articles
 - [ ] Display article type
-- [X] KhiTeX preamble
-- [X] Heading index
-- [X] Label content indicator
-- [X] Scrollable label & details tabs

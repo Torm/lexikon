@@ -3,51 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <title>{TITLE}</title>
-<script src="assets/notarium/script.js"></script>
+<script src="/assets/static/script.js"></script>
+<link rel="preload" href="/model.json" type="text/json">
 <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-<script id="progress-types" type="application/json">{PROGRESS-TYPES}</script>
-<link rel="stylesheet" type="text/css" href="assets/notarium/layout.css">
-<style>{STYLE}</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/dark.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<link rel="stylesheet" type="text/css" href="/assets/static/layout.css">
+<link rel="stylesheet" type="text/css" href="/model.css">
+<script id="resolve-list" type="application/json">{RESOLUTION-PATHS}</script>
 </head>
 <body>
-<div style="display: none">\[{PREAMBLE}\]</div>
-<header id="header"><span class="toolbar-heading">{TITLE}</span></header>
-<main id="main" class="main-both">
-  <nav class="toolbar" id="toolbar">
+<header><nav>
+  <a href="/">Æ</a><a href="/documents">Docs</a>{NAV}<span class="toolbar-heading">{TITLE}</span>
+</nav></header>
+<main class="main-both">
+  <div id="toolbar">
     <div class="menu-container">
-      <div id="label-view-button" class="toolbar-button">
-        <div class="tooltip">Overview</div>
-      </div>
-      <div id="both-view-button" class="toolbar-button"><div class="tooltip">Overview & details</div></div>
-      <div id="article-view-button" class="toolbar-button"><div class="tooltip">Details</div></div>
+      <button id="label-view-button" class="toolbar-button"><div class="tooltip">Overview</div></button>
+      <button id="both-view-button" class="toolbar-button"><div class="tooltip">Overview & details</div></button>
+      <button id="article-view-button" class="toolbar-button"><div class="tooltip">Details</div></button>
     </div>
-<!--    <div class="menubar-spacer">·</div>-->
-<!--    <div class="menu-container">-->
-<!--      <div id="sort-by-section-button" class="toolbar-button">S<div class="tooltip">Arrange in sections</div></div>-->
-<!--      <div id="sort-by-tag-button" class="toolbar-button">T<div class="tooltip">Arrange in tags</div></div>-->
-<!--    </div>-->
-    <div class="menubar-spacer">·</div>
+    <!--     <div class="menubar-spacer"></div>-->
+    <!--     <div class="menu-container">-->
+    <!--       <button id="sort-by-section-button" class="toolbar-button">S<div class="tooltip">Arrange in sections</div></button>-->
+    <!--       <button id="sort-by-tag-button" class="toolbar-button">T<div class="tooltip">Arrange in tags</div></button>-->
+    <!--     </div>-->
+    <div class="menubar-spacer"></div>
     <div class="menu-container">
-      <div id="close-all-button" class="toolbar-button"><div class="tooltip">Close all articles</div></div>
-      <div id="open-all-button" class="toolbar-button"><div class="tooltip">Open all articles</div></div>
+      <button id="close-all-button" class="toolbar-button"><div class="tooltip">Close all articles</div></button>
+      <button id="open-all-button" class="toolbar-button"><div class="tooltip">Open all articles</div></button>
     </div>
-    <div class="menubar-spacer">·</div>
-    <div class="menu-container">
-      <div id="highlight-off-button" class="toolbar-button">P<div class="tooltip">Highlight: None</div></div>
-      <div id="review-highlight-button" class="toolbar-button">L<div class="tooltip">Highlight: Review</div></div>
-      <div id="highlight-incomplete-button" class="toolbar-button">R<div class="tooltip">Highlight: Incomplete<br><br>Highlight incomplete articles.</div></div>
-    </div>
-  </nav>
-  <div id="label-tab">
-    {OVERVIEW}
+    <!--    <div class="menubar-spacer"></div>-->
+    <!--    <div class="menu-container">-->
+    <!--      <div id="highlight-off-button" class="toolbar-button">P<div class="tooltip">Highlight: None</div></div>-->
+    <!--      <div id="review-highlight-button" class="toolbar-button">L<div class="tooltip">Highlight: Review</div></div>-->
+    <!--      <div id="highlight-incomplete-button" class="toolbar-button">R<div class="tooltip">Highlight: Incomplete<br><br>Highlight incomplete articles.</div></div>-->
+    <!--    </div>-->
   </div>
-  <div id="article-tab">
-    <div id="articles">
-      {DETAILS}
-    </div>
- </div>
+  <article id="overview-tab"><h1><span>{TITLE}</span></h1>{OVERVIEW}</article>
+  <article id="article-tab"><div id="articles">{DETAILS}</div></article>
 </main>
-<footer></footer>
+<!--<footer></footer>-->
 <div id="progress-panel">
   <div id="progress-select">
     <div data-level="0" class="progress-level"><div></div><div>Incomplete</div></div>
