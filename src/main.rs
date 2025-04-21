@@ -51,7 +51,9 @@ fn main() {
     let root_dir_path = env::current_dir().unwrap();
     eprintln!("Processing project at {}.", root_dir_path.to_str().unwrap());
     match compile() {
-        Ok(_) => {}
+        Ok(_) => {
+            eprintln!("Project compiled successfully.")
+        }
         Err(e) => {
             eprintln!("Error:\n{}", &e);
         }

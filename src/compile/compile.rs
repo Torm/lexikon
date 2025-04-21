@@ -15,22 +15,31 @@ use khi::pdm::ParsedDictionary;
 use crate::compile::class::{Article, Class, Classes};
 use crate::compile::model::{ArticleType, LinkType, Model};
 use crate::{read, web};
+use crate::compile::dependency::include_dependency;
 use crate::compile::document::{DirNode, DocumentElement, FsDocument, LinksElement};
 use crate::read::article::ReadArticle;
 use crate::read::document::{read_document, ReadDocument, ReadElement, ReadInlineElement};
-use crate::read::project::ReadModel;
+use crate::read::model::{read_model, ReadModel};
 use crate::web::model::generate_model_css;
 
 /// Compile the project.
 /// Assumes file system layout
 pub fn compile() -> Result<(), String> {
     let project = read_project_file(&Path::new("project.khi"))?;
-    let (read_model, resolution_path, commands) = read::project::read_project(&project)?;
+    let (model_file_path, resolution_path, commands, dependencies) = read::project::read_project(&project)?;
+    let parsed_model = read_model_file(Path::new(&model_file_path))?;
+    let parsed_model = read_model(&parsed_model)?;
     let model = Model::new();
-    {process_model(&model, &read_model);}
-    let read_documents = read_document_dir()?;
+    process_model(&model, &parsed_model);
+    let mut read_documents = read_document_dir(Path::new("documents"))?;
+    for dependency in dependencies {
+        let path = dependency.path.as_path();
+        let dependency_documents = include_dependency(&model, path)?;
+        read_documents.extend(dependency_documents);
+    }
     let classes = Classes::new();
-    let documents = process_documents(&model, &classes, read_documents.as_slice(), resolution_path.as_slice())?;
+    process_documents_1(&model, &classes, read_documents.as_slice(), resolution_path.as_slice())?;
+    let documents = process_documents_2(&model, &classes, &read_documents, resolution_path.as_slice())?;
     write_website(&model, &classes, &documents)?;
     Ok(())
 }
@@ -65,7 +74,7 @@ fn process_model<'a>(model: &'a Model<'a>, read_model: &ReadModel) {
 }
 
 /// Read and parse project file.
-fn read_project_file(path: &Path) -> Result<ParsedDictionary, String> {
+pub fn read_project_file(path: &Path) -> Result<ParsedDictionary, String> {
     let file = File::open(path);
     if file.is_err() {
         return Err(format!("Error opening project file {}; does it exist?", path.to_str().unwrap()));
@@ -87,11 +96,24 @@ fn read_project_file(path: &Path) -> Result<ParsedDictionary, String> {
     Ok(parse.unwrap())
 }
 
+//// Model
+
+pub fn read_model_file(model_file_path: &Path) -> Result<ParsedDictionary, String> {
+    let mut model_file = File::open(model_file_path).unwrap();
+    let mut readt_model = String::new();
+    model_file.read_to_string(&mut readt_model).unwrap();
+    let parsed_model = match parse_dictionary_str(&readt_model) {
+        Ok(s) => s,
+        Err(e) => return Err(format!("Error in model file.")),
+    };
+    Ok(parsed_model)
+}
+
 //// Documents directory
 
-fn read_document_dir() -> Result<Vec<ReadFsDocument>, String> {
+pub fn read_document_dir(path: &Path) -> Result<Vec<ReadFsDocument>, String> {
     let mut read_documents = vec![];
-    let document_dir_path = PathBuf::from("documents");
+    let document_dir_path = PathBuf::from(path);
     let mut dir_path = vec![];
     read_document_dir_inner(document_dir_path.as_path(), &mut read_documents, &mut dir_path)?;
     Ok(read_documents)
@@ -132,10 +154,10 @@ fn read_document_dir_inner(dir_path: &Path, read_documents: &mut Vec<ReadFsDocum
     Ok(())
 }
 
-struct ReadFsDocument {
-    file_name: String,
-    dir_path: Vec<Rc<DirNode>>,
-    document: ReadDocument,
+pub struct ReadFsDocument {
+    pub file_name: String,
+    pub dir_path: Vec<Rc<DirNode>>,
+    pub document: ReadDocument,
 }
 
 /// Read a document file.
@@ -193,20 +215,26 @@ fn read_dir_file(dir_file_path: &Path) -> Result<String, String> {
 //// Processing
 
 /// Process the [ReadDocument]s.
+/// First pass - initialize classes and register articles.
 ///
-/// 1) Initializes classes.
+/// 1) Initializes classes that do not exist.
 /// 2) Registers articles.
-/// 3) Registers class links.
-/// 4) Processes each [ReadDocument].
-fn process_documents<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_documents: &[ReadFsDocument], resolution: &[String]) -> Result<Vec<FsDocument<'a>>, String> {
-    let mut documents = Vec::new();
-    // First pass - initialize classes and register articles.
+pub fn process_documents_1<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_documents: &[ReadFsDocument], resolution: &[String]) -> Result<(), String> {
     for read_document in read_documents {
         for read_article in &read_document.document.read_articles {
             register_article(model, classes, read_article)?;
         }
     }
-    // Second pass - process documents and update links.
+    Ok(())
+}
+
+/// Process the [ReadDocument]s.
+/// Second pass - process documents and update links.
+///
+/// 3) Registers class links.
+/// 4) Processes each [ReadDocument].
+pub fn process_documents_2<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_documents: &[ReadFsDocument], resolution: &[String]) -> Result<Vec<FsDocument<'a>>, String> {
+    let mut documents = Vec::new();
     for read_document in read_documents {
         let document = process_document(classes, read_document, resolution)?;
         for read_article in &read_document.document.read_articles {
@@ -410,7 +438,7 @@ fn write_class_page(class_dir_path: &Path, class: &Class) -> Result<(), String> 
     Ok(()) // TODO
 }
 
-fn write_documents(root_path: &Path, documents: &[FsDocument]) -> Result<(), String> {
+pub fn write_documents(root_path: &Path, documents: &[FsDocument]) -> Result<(), String> {
     let document_dir_path = root_path.join("documents");
     fs::create_dir(&document_dir_path); // Create the documents directory.
     for document in documents {

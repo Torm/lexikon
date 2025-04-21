@@ -531,7 +531,7 @@ main.main-details {
     max-width: 90ch;
     margin: 0.5rem 0.5rem;
     min-height: 95%;
-    gap: 0.5rem;
+    //gap: 0.25rem;
 }
 
 /* Article */

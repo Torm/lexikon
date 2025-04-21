@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::Chars;
 
 fn is_key_character(char: char) -> bool{
-    char.is_ascii_alphanumeric() || char == '.' || char == '-' || char == '#' || char == '\''
+    char.is_ascii_alphanumeric() || char == '-' || char == '\'' || char == '&' || char == '.' || char == '#'
 }
 
 pub struct KeyReader<'a> {
