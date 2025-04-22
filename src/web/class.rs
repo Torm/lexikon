@@ -13,7 +13,7 @@ pub fn generate_class_data(class: &Class) -> Result<String, String> {
     // Write articles.
     let mut articles_json = JsonMap::new();
     for article in class.articles.borrow().iter() {
-        let article_key = article.key.clone();
+        let article_key = article.key.borrow().clone();
         let article_json = generate_article_json(article);
         articles_json.insert(article_key, JsonValue::Object(article_json));
     }

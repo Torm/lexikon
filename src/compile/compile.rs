@@ -12,6 +12,7 @@ use khi::{Dictionary, Text, Value};
 use khi::parse::parse_dictionary_str;
 use khi::parse::parser::{error_to_string};
 use khi::pdm::ParsedDictionary;
+use rand::{random, Rng};
 use crate::compile::class::{Article, Class, Classes};
 use crate::compile::model::{ArticleType, LinkType, Model};
 use crate::{read, web};
@@ -20,28 +21,66 @@ use crate::compile::document::{DirNode, DocumentElement, FsDocument, LinksElemen
 use crate::read::article::ReadArticle;
 use crate::read::document::{read_document, ReadDocument, ReadElement, ReadInlineElement};
 use crate::read::model::{read_model, ReadModel};
+use crate::read::project::ReadDependencyEntry;
 use crate::web::model::generate_model_css;
 
 /// Compile the project.
 /// Assumes file system layout
 pub fn compile() -> Result<(), String> {
     let project = read_project_file(&Path::new("project.khi"))?;
-    let (model_file_path, resolution_path, commands, dependencies) = read::project::read_project(&project)?;
+    let (model_file_path, resolution_path, commands, read_dependency_entries) = read::project::read_project(&project)?;
     let parsed_model = read_model_file(Path::new(&model_file_path))?;
     let parsed_model = read_model(&parsed_model)?;
     let model = Model::new();
     process_model(&model, &parsed_model);
     let mut read_documents = read_document_dir(Path::new("documents"))?;
-    for dependency in dependencies {
-        let path = dependency.path.as_path();
-        let dependency_documents = include_dependency(&model, path)?;
-        read_documents.extend(dependency_documents);
-    }
+    let read_dependencies = process_dependencies(&model, read_dependency_entries.as_slice())?;
     let classes = Classes::new();
-    process_documents_1(&model, &classes, read_documents.as_slice(), resolution_path.as_slice())?;
-    let documents = process_documents_2(&model, &classes, &read_documents, resolution_path.as_slice())?;
+    process_documents_1(&model, &classes, read_documents.as_slice(), resolution_path.as_slice(), false)?;
+    for read_dependency in &read_dependencies {
+        let obfuscate = match read_dependency.include {
+            Include::All => false,
+            Include::Articles => false,
+            Include::Obfuscated => true,
+        };
+        process_documents_1(&model, &classes, read_dependency.documents.as_slice(), resolution_path.as_slice(), obfuscate)?;
+    }
+    let mut documents = process_documents_2(&model, &classes, &read_documents, resolution_path.as_slice())?;
+    for read_dependency in &read_dependencies {
+        if matches!(read_dependency.include, Include::All) {
+            let dep_docs = process_documents_2(&model, &classes, &read_documents, resolution_path.as_slice())?;
+            documents.extend(dep_docs);
+        }
+    }
     write_website(&model, &classes, &documents)?;
     Ok(())
+}
+
+/// For the dependencies,
+fn process_dependencies(model: &Model, read_dependencies: &[ReadDependencyEntry]) -> Result<Vec<ReadDependency>, String> {
+    let mut dependencies = vec![];
+    for dependency in read_dependencies {
+        let path = dependency.path.as_path();
+        let include = dependency.include.as_str();
+        let include = match include {
+            "All" => Include::All,
+            "Articles" => Include::Articles,
+            "Obfuscated" => Include::Obfuscated,
+            _ => return Err(format!("Include method {} is not allowed.", include)),
+        };
+        let dependency_documents = include_dependency(&model, path)?;
+        dependencies.push(ReadDependency { include, documents: dependency_documents });
+    }
+    Ok(dependencies)
+}
+
+pub struct ReadDependency {
+    pub include: Include,
+    pub documents: Vec<ReadFsDocument>,
+}
+
+pub enum Include {
+    All, Articles, Obfuscated,
 }
 
 //// Project
@@ -219,10 +258,15 @@ fn read_dir_file(dir_file_path: &Path) -> Result<String, String> {
 ///
 /// 1) Initializes classes that do not exist.
 /// 2) Registers articles.
-pub fn process_documents_1<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_documents: &[ReadFsDocument], resolution: &[String]) -> Result<(), String> {
+pub fn process_documents_1<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_documents: &[ReadFsDocument], resolution: &[String], obfuscate: bool) -> Result<(), String> {
     for read_document in read_documents {
         for read_article in &read_document.document.read_articles {
-            register_article(model, classes, read_article)?;
+            let article = register_article(model, classes, read_article)?;
+            if obfuscate {
+                let rand = rand::rng().random::<u16>();
+                let rand = format!("{:x}", rand);
+                *article.key.borrow_mut() = format!("{}#{}@?", article.class.key.as_ref(), &rand);
+            }
         }
     }
     Ok(())
@@ -293,21 +337,21 @@ fn process_document<'a>(classes: &Classes<'a>, read_fs_document: &ReadFsDocument
 }
 
 /// Register an article and initialize the associated class if it does not already exist.
-fn register_article<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, article: &ReadArticle) -> Result<&'a Article<'a>, String> {
+fn register_article<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_article: &ReadArticle) -> Result<&'a Article<'a>, String> {
     // Get type and ensure it exists.
-    let type_key = article.type_key.as_str();
+    let type_key = read_article.type_key.as_str();
     let type_ = model.get_type(type_key);
     if type_.is_none() {
         return Err(format!("Found non-declared type {}.", type_key));
     }
     let type_ = type_.unwrap();
     // Check article does not already exist.
-    let article_key = article.article_key.as_str();
+    let article_key = read_article.article_key.as_str();
     if let Some(_article) = classes.get_article(article_key) {
         return Err(format!("The article {} already exists.", article_key));
     }
     // Get or create class.
-    let class_key = article.class_key.as_str();
+    let class_key = read_article.class_key.as_str();
     let class = if let Some(class) = classes.get_class(class_key) {
         class
     } else {
@@ -315,12 +359,12 @@ fn register_article<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, article:
     };
     // Check that types match.
     if class.article_type as *const ArticleType != type_ as *const ArticleType {
-        return Err(format!("Article {} declared with different type.", article.article_key.as_str()));
+        return Err(format!("Article {} declared with different type.", read_article.article_key.as_str()));
     }
     // Register article in class.
-    let names = article.names.clone();
-    let content = article.content.clone();
-    let article = Article { class, key: article_key.to_string(), names, content };
+    let names = read_article.names.clone();
+    let content = read_article.content.clone();
+    let article = Article { class, key: RefCell::new(article_key.to_string()), names, content };
     let article = classes.insert_article(article);
     Ok(article)
 }

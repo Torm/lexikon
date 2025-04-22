@@ -29,7 +29,7 @@ impl<'a> Class<'a> {
 
     pub fn contains_article(&self, article_key: &str) -> bool {
         for article in self.articles.borrow().iter() {
-            if article.key == article_key {
+            if article.key.borrow().as_str() == article_key {
                 return true;
             }
         }
@@ -38,7 +38,7 @@ impl<'a> Class<'a> {
 
     pub fn get_article(&self, article_key: &str) -> Option<&'a Article<'a>> {
         for article in self.articles.borrow().iter() {
-            if article.key == article_key {
+            if article.key.borrow().as_str() == article_key {
                 return Some(article)
             }
         }
@@ -55,7 +55,7 @@ impl<'a> Class<'a> {
     pub fn resolve(&self, paths: &[String]) -> &'a Article<'a> {
         for path in paths {
             for article in self.articles.borrow().iter() {
-                if article.key.ends_with(&format!("@{}", path)) {
+                if article.key.borrow().ends_with(&format!("@{}", path)) {
                     return article;
                 }
             }
@@ -68,7 +68,7 @@ impl<'a> Class<'a> {
 /// An article.
 pub struct Article<'a> {
     pub(crate) class: &'a Class<'a>,
-    pub(crate) key: String,
+    pub(crate) key: RefCell<String>,
     pub(crate) names: Vec<String>,
     pub(crate) content: Vec<ArticleElement>,
 }
@@ -126,12 +126,12 @@ impl<'a> Classes<'a> {
     }
 
     pub(crate) fn insert_article(&'a self, article: Article<'a>) -> &'a Article<'a> {
-        if self.article_map.borrow().contains_key(article.key.as_str()) {
-            eprintln!("Article {} was already registered.", article.key.as_str());
+        if self.article_map.borrow().contains_key(article.key.borrow().as_str()) {
+            eprintln!("Article {} was already registered.", article.key.borrow().as_str());
         }
         let article = self.article_arena.alloc(article);
         let article: &'a Article<'a> = unsafe { transmute(article) }; // TODO: Fix? Should be OK since 'a lives as long as the arena.
-        self.article_map.borrow_mut().insert(Rc::from(article.key.as_str()), article);
+        self.article_map.borrow_mut().insert(Rc::from(article.key.borrow().as_str()), article);
         article.class.articles.borrow_mut().push(article);
         article
     }

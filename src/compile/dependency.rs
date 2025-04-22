@@ -1,13 +1,17 @@
 //! Dependency inclusion
 
 use std::path::Path;
-use khi::{Dictionary, Value};
-use crate::compile::compile::{read_document_dir, read_model_file, read_project_file, ReadFsDocument};
+use khi::{Dictionary};
+use crate::compile::compile::{read_document_dir, read_model_file, read_project_file, Include, ReadDependency, ReadFsDocument};
 use crate::compile::model::Model;
 use crate::read::model::read_model;
 use crate::read::project::read_project;
 
-/// Verify that the types in the dependency model exist in the project model.
+/// Read a dependency project.
+///
+/// 1) Read the dependency project file.
+/// 2) Verify compatibility of the dependency with the project.
+/// 3) Read the dependency documents.
 pub fn include_dependency(model: &Model, dependency_path: &Path) -> Result<Vec<ReadFsDocument>, String> {
     let parsed_dependency_project = dependency_path.join("project.khi");
     let parsed_dependency_project = read_project_file(&parsed_dependency_project)?;

@@ -1,7 +1,7 @@
 //! Read the project file.
 
 use std::path::PathBuf;
-use khi::pdm::{ParsedDictionary, Position};
+use khi::pdm::{ParsedDictionary};
 use khi::{Dictionary, List, Text, Value};
 use khi::tex::{BreakMode, write_tex_with};
 use crate::{tex_error_to_text};
@@ -15,7 +15,15 @@ pub fn read_project(project: &ParsedDictionary) -> Result<ReadProject, String> {
 }
 
 // pub type ReadProject = (ReadModel, ResolutionPaths, DefinedCommands); // TODO
-pub type ReadProject = (String, ResolutionPaths, Option<String>, Vec<Dependency>);
+pub type ReadProject = (String, ResolutionPaths, Option<String>, Vec<ReadDependencyEntry>);
+
+pub struct ReadProjectX {
+    model_path: String,
+    resolution_paths: ResolutionPaths,
+    // defined_commands: ... TODO
+    preamble: Option<String>,
+    dependencies: Vec<ReadDependencyEntry>,
+}
 
 //// Header
 
@@ -77,7 +85,7 @@ fn read_preamble(project: &ParsedDictionary) -> Result<Option<String>, String> {
 
 //// Dependencies
 
-fn read_dependencies(project: &ParsedDictionary) -> Result<Vec<Dependency>, String> {
+fn read_dependencies(project: &ParsedDictionary) -> Result<Vec<ReadDependencyEntry>, String> {
     let mut dependencies = vec![];
     if let Some(readt_dependencies) = project.get("Dependencies") {
         if !readt_dependencies.is_dictionary() {
@@ -89,21 +97,29 @@ fn read_dependencies(project: &ParsedDictionary) -> Result<Vec<Dependency>, Stri
                 return Err(format!(r#"Dependency must be a dictionary."#));
             }
             let dependency = dependency.as_dictionary().unwrap();
-            if let Some(path) = dependency.get("Path") {
+            let path = if let Some(path) = dependency.get("Path") {
                 if !path.is_text() {
-                    return Err(format!(r#"Dependency path must be text."#));
+                    return Err(format!(r#"Dependency Path entry must be text."#));
                 }
-                let path = PathBuf::from(path.as_text().unwrap().as_str());
-                dependencies.push(Dependency { path });
+                PathBuf::from(path.as_text().unwrap().as_str())
             } else {
                 return Err(format!(r#"Dependency must have a Path entry."#));
-            }
+            };
+            let include = if let Some(inclusion) = dependency.get("Include") {
+                if !inclusion.is_text() {
+                    return Err(format!(r#"Dependency Include entry must be text."#));
+                }
+                String::from(inclusion.as_text().unwrap().as_str())
+            } else {
+                String::from("All")
+            };
+            dependencies.push(ReadDependencyEntry { path, include });
         }
     }
     Ok(dependencies)
 }
 
-pub struct Dependency {
+pub struct ReadDependencyEntry {
     pub path: PathBuf,
-
+    pub include: String,
 }

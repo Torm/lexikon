@@ -96,7 +96,8 @@ fn generate_article_link(html: &mut Vec<u8>, article: &Article, index: Option<&S
             html.extend_from_slice(type_key);
             template = &template[6..];
         } else if template.starts_with(b"{ARTICLE}") {
-            let article_key = article.key.as_bytes();
+            let article_key = article.key.borrow();
+            let article_key = article_key.as_bytes();
             html.extend_from_slice(article_key);
             template = &template[9..];
         } else if template.starts_with(b"{ABBREVIATION}") {
@@ -179,7 +180,8 @@ fn generate_prerendered_article(html: &mut Vec<u8>, article: &Article, resolutio
     let type_ = class.article_type;
     while template.len() != 0 {
         if template.starts_with(b"{ARTICLE}") {
-            let article_key = article.key.as_bytes();
+            let article_key = article.key.borrow();
+            let article_key = article_key.as_bytes();
             html.extend_from_slice(article_key);
             template = &template[9..];
         } else if template.starts_with(b"{CLASS}") {
@@ -230,7 +232,7 @@ fn generate_article_links(html: &mut Vec<u8>, class: &Class, resolution_paths: &
         for linked_class in linked_classes {
             let linked_class_key = &*linked_class.key;
             let resolved_article = linked_class.resolve(resolution_paths);
-            let resolved_article_key = &resolved_article.key;
+            let resolved_article_key = &resolved_article.key.borrow();
             let resolved_article_name = &resolved_article.names[0];
             let link_html = format!(r#"<button class="link" data-class="{linked_class_key}" data-article="{resolved_article_key}">{resolved_article_name}</button>"#);
             html.extend_from_slice(link_html.as_bytes());
@@ -246,7 +248,7 @@ fn generate_article_links(html: &mut Vec<u8>, class: &Class, resolution_paths: &
         for linked_class in linked_classes {
             let linked_class_key = &*linked_class.key;
             let resolved_article = linked_class.resolve(resolution_paths);
-            let resolved_article_key = &resolved_article.key;
+            let resolved_article_key = &resolved_article.key.borrow();
             let resolved_article_name = &resolved_article.names[0];
             let link_html = format!(r#"<button class="link" data-class="{linked_class_key}" data-article="{resolved_article_key}">{resolved_article_name}</button>"#);
             html.extend_from_slice(link_html.as_bytes());
