@@ -219,7 +219,17 @@ function init() {
             createTooltip(event.target, document.createTextNode("View articles in class"));
         }
     });
-
+    // Article parameter tooltips.
+    document.addEventListener("mouseover", event => {
+        if (!event.target.matches(".article > header > hgroup b")) return;
+        let classKey = event.target.getAttribute("data-class");
+        let classe = loadedClasses.get(classKey);
+        if (classe === undefined) return;
+        let [articleKey, articleData] = resolve(classe, resolutionPath);
+        let html = document.createElement("div");
+        html.innerHTML = getArticleFullNameHtml(articleData.names[0]);
+        createTooltip(event.target, html);
+    });
     document.addEventListener("mouseover", event => {
         let target = event.target;
         let tooltip = target.querySelector(".tooltip:not(.temp)");
@@ -357,7 +367,7 @@ async function populateLinks(article) {
                         continue;
                     }
                     let [articleKey, articleData] = resolve(targetClass, resolutionPath);
-                    let articleName = articleData.names[0];
+                    let articleName = getArticleName(articleData.names[0]);
                     let linkTag = document.createElement("button");
                     linkTag.classList.add("link");
                     linkTag.setAttribute("data-class", target);
@@ -380,7 +390,7 @@ async function populateLinks(article) {
                         continue;
                     }
                     let [articleKey, articleData] = resolve(targetClass, resolutionPath);
-                    let articleName = articleData.names[0];
+                    let articleName = getArticleName(articleData.names[0]);
                     let linkTag = document.createElement("button");
                     linkTag.classList.add("link");
                     linkTag.setAttribute("data-class", target);
@@ -392,6 +402,22 @@ async function populateLinks(article) {
         }
     }
     linkSection.classList.remove("unloaded");
+}
+
+function getArticleName(articleDataName) {
+    if (Array.isArray(articleDataName)) {
+        return articleDataName[0]
+    } else {
+        return articleDataName
+    }
+}
+
+function getArticleFullNameHtml(articleDataName) {
+    if (Array.isArray(articleDataName)) {
+        return articleDataName[1]
+    } else {
+        return "<strong>" + articleDataName + "</strong>"
+    }
 }
 
 function readDocumentResolutionData() {
@@ -498,12 +524,12 @@ function generateArticle(typeKey, classKey, articleKey, articleData) {
     header.appendChild(hgroup);
     {
         let h1 = document.createElement("h1");
-        h1.textContent = articleData.names[0];
+        h1.innerHTML = getArticleFullNameHtml(articleData.names[0]);
         hgroup.appendChild(h1);
         let i = 1;
         while (i < articleData.names.length) {
             let p = document.createElement("p");
-            p.textContent = articleData.names[i];
+            p.innerHTML = getArticleFullNameHtml(articleData.names[i]);
             hgroup.appendChild(p);
             i++;
         }
@@ -716,7 +742,7 @@ function generateClassDialogEntry(key, article) {
     li.appendChild(keySpan);
     let nameSpan = document.createElement("span");
     nameSpan.classList.add("name");
-    nameSpan.textContent = article.names[0];
+    nameSpan.textContent = getArticleName(article.names[0]);
     MathJax.typeset([nameSpan]);
     li.appendChild(nameSpan);
     return li;

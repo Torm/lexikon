@@ -107,9 +107,8 @@ fn generate_article_link(html: &mut Vec<u8>, article: &Article, index: Option<&S
             }
             template = &template[14..];
         } else if template.starts_with(b"{NAME}") {
-            let default_name = "???".into();
-            let name = article.names.first().unwrap_or(&default_name);
-            html.extend_from_slice(name.as_ref());
+            let name = &article.names.first().unwrap().get_name(); // TODO: Check name exists
+            html.extend_from_slice(name.as_bytes());
             template = &template[6..];
         } else if template.starts_with(b"{INDEX}") {
             if let Some(index) = index {
@@ -193,13 +192,15 @@ fn generate_prerendered_article(html: &mut Vec<u8>, article: &Article, resolutio
             html.extend_from_slice(type_key);
             template = &template[6..];
         } else if template.starts_with(b"{NAMES}") {
-            let primary_name = article.names[0].as_bytes();
+            let primary_name = article.names[0].get_full_html();
+            let primary_name = primary_name.as_bytes();
             html.extend_from_slice(b"<h1>");
             html.extend_from_slice(primary_name);
             html.extend_from_slice(b"</h1>");
             let mut i = 1;
             while i < article.names.len() {
-                let name = article.names[i].as_str();
+                let name = article.names[i].get_full_html();
+                let name = name.as_str();
                 html.extend_from_slice(b"<p>");
                 html.extend_from_slice(name.as_bytes());
                 html.extend_from_slice(b"</p>");
@@ -233,7 +234,7 @@ fn generate_article_links(html: &mut Vec<u8>, class: &Class, resolution_paths: &
             let linked_class_key = &*linked_class.key;
             let resolved_article = linked_class.resolve(resolution_paths);
             let resolved_article_key = &resolved_article.key.borrow();
-            let resolved_article_name = &resolved_article.names[0];
+            let resolved_article_name = &resolved_article.names[0].get_name();
             let link_html = format!(r#"<button class="link" data-class="{linked_class_key}" data-article="{resolved_article_key}">{resolved_article_name}</button>"#);
             html.extend_from_slice(link_html.as_bytes());
         }
@@ -249,7 +250,7 @@ fn generate_article_links(html: &mut Vec<u8>, class: &Class, resolution_paths: &
             let linked_class_key = &*linked_class.key;
             let resolved_article = linked_class.resolve(resolution_paths);
             let resolved_article_key = &resolved_article.key.borrow();
-            let resolved_article_name = &resolved_article.names[0];
+            let resolved_article_name = &resolved_article.names[0].get_name();
             let link_html = format!(r#"<button class="link" data-class="{linked_class_key}" data-article="{resolved_article_key}">{resolved_article_name}</button>"#);
             html.extend_from_slice(link_html.as_bytes());
         }

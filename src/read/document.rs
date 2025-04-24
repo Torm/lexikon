@@ -3,7 +3,7 @@
 use khi::{Dictionary, List, Tagged, Text, Tuple, Value};
 use khi::pdm::{ParsedDictionary, ParsedList, ParsedTaggedValue, ParsedValue, Position};
 use crate::read::article::{read_article_declaration, ReadArticle};
-use crate::read::content::read_content_text;
+use crate::read::markup::read_markup;
 use crate::compile::key::KeyReader;
 //// Document
 
@@ -117,7 +117,7 @@ fn read_document_content(parsed_content: &ParsedList, document_key: &str) -> Res
                 read_elements.push(ReadElement::Heading(level, index, heading));
             }
         } else if name == "P" {
-            let paragraph = read_content_text(value)?;
+            let paragraph = read_markup(value)?;
             read_elements.push(ReadElement::Paragraph(paragraph));
         } else if name == "@" {
             let include = read_content_include(tag, at, document_key)?;
@@ -226,9 +226,9 @@ fn read_content_heading(tag: &ParsedTaggedValue) -> Result<(u8, String, Option<S
         if value.len() != 2 {
             return Err(format!("Heading at {}:{} must be tuple with 1 or 2 elements.", tag.value.from().line, tag.value.from().column));
         }
-        (Some(read_content_text(value.get(0).unwrap())?), read_content_text(value.get(1).unwrap())?)
+        (Some(read_markup(value.get(0).unwrap())?), read_markup(value.get(1).unwrap())?)
     } else {
-        (None, read_content_text(value)?)
+        (None, read_markup(value)?)
     };
     // Check inline param.
     let inline = tag.attributes.iter().find(|x| x.0.as_ref() == "i").is_some();

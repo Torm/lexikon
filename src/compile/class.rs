@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::mem::transmute;
 use std::rc::Rc;
 use typed_arena::Arena;
+use crate::compile::compile::Name;
 use crate::compile::model::{ArticleType, LinkType};
 use crate::read::article::ArticleElement;
 
@@ -69,7 +70,7 @@ impl<'a> Class<'a> {
 pub struct Article<'a> {
     pub(crate) class: &'a Class<'a>,
     pub(crate) key: RefCell<String>,
-    pub(crate) names: Vec<String>,
+    pub(crate) names: Vec<Name>,
     pub(crate) content: Vec<ArticleElement>,
 }
 
@@ -141,9 +142,14 @@ impl<'a> Classes<'a> {
     /// No change if link already exists.
     pub(crate) fn insert_link(&'a self, type_: &'a LinkType<'a>, from: &'a Class<'a>, to: &'a Class<'a>) {
         let mut links_out = from.links_out.borrow_mut();
-        let mut linked_out = false;
+        let mut linked_out = false; // Will be true if the link type exists.
         for (link_type, linked_classes) in links_out.iter_mut() {
             if *link_type as *const LinkType == type_ as *const LinkType {
+                for linked_class in linked_classes.iter() {
+                    if *linked_class as *const Class == to as *const Class {
+                        return; // Link already exists.
+                    }
+                }
                 linked_classes.push(to);
                 linked_out = true;
             }

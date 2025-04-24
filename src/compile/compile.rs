@@ -18,7 +18,7 @@ use crate::compile::model::{ArticleType, LinkType, Model};
 use crate::{read, web};
 use crate::compile::dependency::include_dependency;
 use crate::compile::document::{DirNode, DocumentElement, FsDocument, LinksElement};
-use crate::read::article::ReadArticle;
+use crate::read::article::{ParameterElement, ReadArticle, ReadName};
 use crate::read::document::{read_document, ReadDocument, ReadElement, ReadInlineElement};
 use crate::read::model::{read_model, ReadModel};
 use crate::read::project::ReadDependencyEntry;
@@ -362,11 +362,84 @@ fn register_article<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_art
         return Err(format!("Article {} declared with different type.", read_article.article_key.as_str()));
     }
     // Register article in class.
-    let names = read_article.names.clone();
+    let names = read_article.names.as_slice();
+    let names = process_names(names)?;
     let content = read_article.content.clone();
     let article = Article { class, key: RefCell::new(article_key.to_string()), names, content };
     let article = classes.insert_article(article);
     Ok(article)
+}
+
+fn process_names(read_names: &[ReadName]) -> Result<Vec<Name>, String> {
+    let mut names = vec![];
+    for read_name in read_names {
+        let mut is_parametrized = false;
+        for e in read_name {
+            if matches!(e, ParameterElement::Name(..) | ParameterElement::Parameter(..)) {
+                is_parametrized = true;
+                break;
+            }
+        }
+        if is_parametrized {
+            let mut name = String::new();
+            let mut parametrization = String::new();
+            for e in read_name {
+                match e {
+                    ParameterElement::Name(n) => {
+                        name.push_str(n);
+                        parametrization.push_str("<strong>");
+                        parametrization.push_str(n);
+                        parametrization.push_str("</strong>");
+                    }
+                    ParameterElement::Preposition(p) => {
+                        parametrization.push_str(p);
+                    }
+                    ParameterElement::Parameter(p, k) => {
+                        parametrization.push_str(&format!(r#"<b data-class="{}">"#, k));
+                        parametrization.push_str(p);
+                        parametrization.push_str("</b>");
+                    }
+                }
+            }
+            names.push(Name { name, parametrization: Some(parametrization) });
+        } else {
+            let mut name = String::new();
+            for e in read_name {
+                if let ParameterElement::Preposition(e) = e {
+                    name.push_str(e);
+                } else {
+                    unreachable!()
+                }
+            }
+            names.push(Name { name, parametrization: None });
+        }
+    }
+    Ok(names)
+}
+
+pub struct Name {
+    pub name: String,
+    pub parametrization: Option<String>,
+}
+
+impl Name {
+
+    pub fn get_full_html(&self) -> String {
+        if let Some(s) = &self.parametrization {
+            s.clone()
+        } else {
+            format!("<strong>{}</strong>", &self.name)
+        }
+    }
+
+    pub fn get_short_html(&self) -> String {
+        format!("<strong>{}</strong>", &self.name)
+    }
+
+    pub fn get_name(&self) -> &str {
+        self.name.as_str()
+    }
+
 }
 
 /// Register the read links.
@@ -389,6 +462,26 @@ fn update_class_links<'a>(classes: &'a Classes<'a>, read_article: &ReadArticle) 
             }
             let linked_class = linked_class.unwrap();
             classes.insert_link(link_type, class, linked_class);
+        }
+    }
+    // Special links: parameters - add the name parameters to the Parameters link.
+    for read_names in &read_article.names {
+        for read_name in read_names {
+            match read_name {
+                ParameterElement::Parameter(_, parameter_class_key) => {
+                    if let Some(parameter_class) = classes.get_class(parameter_class_key.as_str()) {
+                        let parameters_link_type = article_type.get_link("Parameters");
+                        if parameters_link_type.is_none() {
+                            return Err(format!("Parameters link type does not exist for type {}.", &article_type.key));
+                        }
+                        let parameters_link_type = parameters_link_type.unwrap();
+                        classes.insert_link(parameters_link_type, class, parameter_class);
+                    } else {
+                        return Err(format!("Parameter class {} does not exist.", parameter_class_key));
+                    }
+                }
+                _ => {}
+            }
         }
     }
     Ok(())

@@ -5,13 +5,13 @@ use khi::tex::{write_tex_with, BreakMode};
 use khi::{Compound, Element, Tagged, Text, Tuple, Value};
 use crate::tex_error_to_text;
 
-pub fn read_content_text(input: &ParsedValue) -> Result<String, String> {
+pub fn read_markup(input: &ParsedValue) -> Result<String, String> {
     let mut output = String::new();
-    convert_content_text(&mut output, input)?;
+    convert_markup_text(&mut output, input)?;
     Ok(output)
 }
 
-fn convert_content_text(output: &mut String, input: &ParsedValue) -> Result<(), String> {
+fn convert_markup_text(output: &mut String, input: &ParsedValue) -> Result<(), String> {
     match input {
         ParsedValue::Text(s, _, _) => Ok(output.push_str(s.as_str())),
         ParsedValue::Tagged(t, _, _) => {
@@ -42,10 +42,10 @@ fn convert_content_text(output: &mut String, input: &ParsedValue) -> Result<(), 
                         } else {
                             let mut iter = t.iter();
                             let fv = iter.next().unwrap();
-                            convert_content_text(output, fv)?;
+                            convert_markup_text(output, fv)?;
                             for v in iter {
                                 output.push_str("<br>");
-                                convert_content_text(output, v)?;
+                                convert_markup_text(output, v)?;
                             }
                         }
                     }
@@ -58,7 +58,7 @@ fn convert_content_text(output: &mut String, input: &ParsedValue) -> Result<(), 
                 }
                 let values = t.value.as_tuple().unwrap();
                 let href = values.get(0).unwrap().as_text().unwrap().as_str();
-                let label = read_content_text(values.get(1).unwrap())?;
+                let label = read_markup(values.get(1).unwrap())?;
                 output.push_str(&format!("<a href=\"{href}\">{label}</a>"));
                 Ok(())
             } else if name == "code" {
@@ -87,7 +87,7 @@ fn convert_content_text(output: &mut String, input: &ParsedValue) -> Result<(), 
         ParsedValue::Compound(c, _, _) => {
             for c in c.iter() {
                 match c {
-                    Element::Element(e) => convert_content_text(output, e)?,
+                    Element::Element(e) => convert_markup_text(output, e)?,
                     Element::Whitespace => output.push(' '),
                 }
             }

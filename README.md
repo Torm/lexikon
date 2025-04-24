@@ -1,4 +1,4 @@
-# Notarium
+# Lexikon
 
 Create an overview of a subject by breaking it up into smaller units of
 *articles*.

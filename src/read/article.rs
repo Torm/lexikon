@@ -1,10 +1,10 @@
 //! Reading articles.
 
 use khi::pdm::{ParsedDictionary, ParsedTaggedValue, ParsedValue, Position};
-use khi::{Dictionary, List, Tagged, Text, Value};
+use khi::{Compound, Dictionary, Element, List, Tagged, Text, Tuple, Value};
 use khi::tex::{write_tex_with, BreakMode};
 use crate::{tex_error_to_text};
-use crate::read::content::read_content_text;
+use crate::read::markup::read_markup;
 use crate::compile::key::KeyReader;
 
 pub fn read_article_declaration(tag: &ParsedTaggedValue, at: Position, document_key: &str) -> Result<ReadArticle, String> {
@@ -62,7 +62,7 @@ pub struct ReadArticle {
     pub(crate) type_key: String,
     pub(crate) class_key: String,
     pub(crate) article_key: String, // TODO: Parse class and article keys in compilation
-    pub(crate) names: Vec<String>,
+    pub(crate) names: Vec<ReadName>,
     pub(crate) content: Vec<ArticleElement>,
     pub(crate) links: Vec<(String, Vec<String>)>,
 }
@@ -89,18 +89,89 @@ fn read_links(parsed_links: &ParsedDictionary, at: Position) -> Result<Vec<(Stri
 }
 
 /// Read the declared names.
-fn read_declaration_names(argument: &ParsedValue) -> Result<Vec<String>, String> {
+fn read_declaration_names(argument: &ParsedValue) -> Result<Vec<ReadName>, String> {
     let mut names = Vec::new();
     if argument.is_list() {
         for name in argument.as_list().unwrap().iter() {
-            let name = read_content_text(name)?;
+            let name = read_declaration_name(name)?;
             names.push(name);
         }
     } else {
-        let name = read_content_text(argument)?;
+        let name = read_declaration_name(argument)?;
         names.push(name)
     }
     Ok(names)
+}
+
+fn read_declaration_name(element: &ParsedValue) -> Result<ReadName, String> {
+    let mut parametrization = vec![];
+    match element {
+        ParsedValue::Tuple(tuple, _, _) => {
+            if tuple.is_empty() {
+                parametrization.push(ParameterElement::Preposition(String::from("?"))); // TODO: ? should be type name.
+            } else {
+                return Err(format!("Name must be empty tuple or compound of text, tags, nils and compounds."));
+            }
+        }
+        ParsedValue::Nil(..) | ParsedValue::Text(..) | ParsedValue::Tagged(..) => {
+            read_declaration_name_element(&mut parametrization, element)?;
+        }
+        ParsedValue::Compound(compound, _, _) => {
+            for i in compound.iter() {
+                match i {
+                    Element::Element(i) => {
+                        read_declaration_name_element(&mut parametrization, i)?;
+                    }
+                    Element::Whitespace => {
+                        parametrization.push(ParameterElement::Preposition(String::from(" ")));
+                    }
+                }
+            }
+        }
+        ParsedValue::Dictionary(..) | ParsedValue::List(..) => {
+            return Err(format!("Name must be empty tuple or compound of text, tags, nils and compounds."));
+        }
+    }
+    Ok(parametrization)
+}
+
+pub type ReadName = Vec<ParameterElement>;
+
+fn read_declaration_name_element(parametrization: &mut Vec<ParameterElement>, element: &ParsedValue) -> Result<(), String> {
+    match element {
+        ParsedValue::Tagged(tagged, _, _) => {
+            let name = tagged.name.as_ref();
+            if name.starts_with("@") {
+                let name = name.strip_prefix("@").unwrap();
+                if name.is_empty() {
+                    let text = read_markup(tagged.get())?;
+                    parametrization.push(ParameterElement::Name(text));
+                } else {
+                    let text = read_markup(tagged.get())?;
+                    let key = String::from(name);
+                    parametrization.push(ParameterElement::Parameter(text, key));
+                }
+            } else {
+                let text = read_markup(element)?;
+                parametrization.push(ParameterElement::Preposition(text));
+            }
+        }
+        ParsedValue::Compound(..) | ParsedValue::Nil(..) | ParsedValue::Text(..) => {
+            let text = read_markup(element)?;
+            parametrization.push(ParameterElement::Preposition(text));
+        }
+        ParsedValue::Tuple(..) | ParsedValue::Dictionary(..) | ParsedValue::List(..) => {
+            return Err(format!("Name element cannot be tuple, dictionary or list."));
+        }
+    }
+    Ok(())
+}
+
+pub enum ParameterElement {
+    Name(String),
+    Preposition(String),
+    /// Parameter(name, key)
+    Parameter(String, String),
 }
 
 /// Read the body of an article.
@@ -112,7 +183,7 @@ fn read_article_content(input: &ParsedValue) -> Result<Vec<ArticleElement>, Stri
             if !c.is_tagged() {
                 // return Err(format!("Element of article content list at {}:{} must be a tagged value", c.from().line, c.from().column));
                 // TODO: Below is very temporary workaround.
-                let txt = read_content_text(c)?;
+                let txt = read_markup(c)?;
                 article_elements.push(ArticleElement::Html(format!(r#"<p>{}</p>"#, &txt))); // TODO Use Paragraph but wrap in div not p?
                 continue;
             }
@@ -121,22 +192,22 @@ fn read_article_content(input: &ParsedValue) -> Result<Vec<ArticleElement>, Stri
             if name == "H1" { // TODO: Not allowed, + check levels, check in compilation?
                 return Err(format!("H1 heading not allowed in article at {}:{}.", input.from().line, input.from().column));
             } else if name == "H2" {
-                let tex = read_content_text(tag.value.as_ref())?;
+                let tex = read_markup(tag.value.as_ref())?;
                 article_elements.push(ArticleElement::Heading(2, tex));
             } else if name == "H3" {
-                let tex = read_content_text(tag.value.as_ref())?;
+                let tex = read_markup(tag.value.as_ref())?;
                 article_elements.push(ArticleElement::Heading(3, tex));
             } else if name == "H4" {
-                let tex = read_content_text(tag.value.as_ref())?;
+                let tex = read_markup(tag.value.as_ref())?;
                 article_elements.push(ArticleElement::Heading(4, tex));
             } else if name == "H5" {
-                let tex = read_content_text(tag.value.as_ref())?;
+                let tex = read_markup(tag.value.as_ref())?;
                 article_elements.push(ArticleElement::Heading(5, tex));
             } else if name == "H6" {
-                let tex = read_content_text(tag.value.as_ref())?;
+                let tex = read_markup(tag.value.as_ref())?;
                 article_elements.push(ArticleElement::Heading(6, tex));
             } else if name == "P" {
-                let tex = read_content_text(tag.value.as_ref())?;
+                let tex = read_markup(tag.value.as_ref())?;
                 article_elements.push(ArticleElement::Paragraph(tex));
             } else if name == "$$" {
                 let tex = write_tex_with(tag.value.as_ref(), BreakMode::Never).or_else(tex_error_to_text)?;
@@ -171,7 +242,7 @@ fn read_article_content(input: &ParsedValue) -> Result<Vec<ArticleElement>, Stri
             }
         }
     } else {
-        let tex = read_content_text(input)?;
+        let tex = read_markup(input)?;
         article_elements.push(ArticleElement::Paragraph(tex));
     }
     Ok(article_elements)

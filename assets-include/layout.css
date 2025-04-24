@@ -684,6 +684,44 @@ main.main-details {
     content: "−";
 }
 
+/* Article headings */
+
+.article > header {
+    color: #a1a1a1;
+}
+.article > header > hgroup > h1, .article > header > hgroup > p {
+    font-size: 1.25rem;
+    font-weight: normal;
+}
+.article > header > hgroup > p {
+    font-size: 0.66rem;
+    font-weight: normal;
+}
+.article > header strong {
+    font-weight: bold;
+    color: white;
+}
+.article > header b {
+    font-weight: normal;
+    //text-decoration: dotted underline 1px #707070;
+    color: #e1e1e1;
+}
+.article > .content h2 {
+    font-size: 1.20rem;
+}
+.article > .content h3 {
+    font-size: 1.15rem;
+}
+.article > .content h4 {
+    font-size: 1.10rem;
+}
+.article > .content h5 {
+    font-size: 1.05rem;
+}
+.article > .content h6 {
+    font-size: 1.00rem;
+}
+
 /* Article > Content */
 
 .article > .content {

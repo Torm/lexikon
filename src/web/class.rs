@@ -54,8 +54,13 @@ fn generate_article_json(article: &Article) -> JsonMap<String, JsonValue> {
     let mut article_json = JsonMap::new();
     let mut names_json = vec![];
     for name in &article.names {
-        let name_json = JsonValue::String(name.clone());
-        names_json.push(name_json);
+        if let Some(param) = &name.parametrization {
+            let name_json = JsonValue::Array(vec![JsonValue::String(name.name.clone()), JsonValue::String(param.clone())]);
+            names_json.push(name_json);
+        } else {
+            let name_json = JsonValue::String(name.name.clone());
+            names_json.push(name_json);
+        }
     }
     article_json.insert("names".into(), JsonValue::Array(names_json));
     let article_elements = article.content.as_slice();
