@@ -704,7 +704,7 @@ main.main-details {
 .article > header b {
     font-weight: normal;
     //text-decoration: dotted underline 1px #707070;
-    color: #e1e1e1;
+    color: white;
 }
 .article > .content h2 {
     font-size: 1.20rem;

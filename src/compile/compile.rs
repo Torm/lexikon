@@ -1,6 +1,7 @@
 //! Compilation
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fs;
 use std::fs::{read_dir, File};
 use std::io::{Read, Write};
@@ -261,7 +262,7 @@ fn read_dir_file(dir_file_path: &Path) -> Result<String, String> {
 pub fn process_documents_1<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_documents: &[ReadFsDocument], resolution: &[String], obfuscate: bool) -> Result<(), String> {
     for read_document in read_documents {
         for read_article in &read_document.document.read_articles {
-            let article = register_article(model, classes, read_article)?;
+            let article = register_article(model, classes, read_article, &read_document.document.aliases)?;
             if obfuscate {
                 let rand = rand::rng().random::<u16>();
                 let rand = format!("{:x}", rand);
@@ -282,11 +283,19 @@ pub fn process_documents_2<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, r
     for read_document in read_documents {
         let document = process_document(classes, read_document, resolution)?;
         for read_article in &read_document.document.read_articles {
-            update_class_links(classes, read_article)?;
+            update_class_links(classes, read_article, &read_document.document.aliases)?;
         }
         documents.push(document);
     }
     Ok(documents)
+}
+
+fn resolve_alias<'a>(aliases: &'a HashMap<String, String>, alias: &'a str) -> &'a str {
+    if let Some(target) = aliases.get(alias) {
+        target.as_str()
+    } else {
+        alias
+    }
 }
 
 /// Process a read document.
@@ -301,6 +310,7 @@ fn process_document<'a>(classes: &Classes<'a>, read_fs_document: &ReadFsDocument
     let description = read_document.description.clone();
     let preamble = read_document.preamble.clone();
     let mut resolution_paths = vec![];
+    let local_aliases = &read_document.aliases;
     resolution_paths.extend_from_slice(&read_document.resolution_paths);
     resolution_paths.extend_from_slice(project_resolution_paths);
     let mut structure = Vec::new();
@@ -319,10 +329,11 @@ fn process_document<'a>(classes: &Classes<'a>, read_fs_document: &ReadFsDocument
                         ReadInlineElement::Heading(level, text, index) => {
                             panel.push(LinksElement::Heading(*level, text.to_string(), index.clone()));
                         }
-                        ReadInlineElement::Link(link_key, index) => {
-                            let article = classes.get_article(&link_key);
+                        ReadInlineElement::Link(local_link_key, index) => {
+                            let link_key = resolve_alias(local_aliases, local_link_key.as_str());
+                            let article = classes.get_article(link_key);
                             if article.is_none() {
-                                return Err(format!("Article {} does not exist.", &link_key));
+                                return Err(format!("Article {} ({}) does not exist.", link_key, local_link_key));
                             }
                             let article = article.unwrap();
                             panel.push(LinksElement::Link(article, index.clone()));
@@ -337,7 +348,9 @@ fn process_document<'a>(classes: &Classes<'a>, read_fs_document: &ReadFsDocument
 }
 
 /// Register an article and initialize the associated class if it does not already exist.
-fn register_article<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_article: &ReadArticle) -> Result<&'a Article<'a>, String> {
+///
+/// resolved_class_key - The ReadArticle.class_key may use an alias within the document. This key has been checked to be the real class key.
+fn register_article<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_article: &ReadArticle, aliases: &HashMap<String, String>) -> Result<&'a Article<'a>, String> {
     // Get type and ensure it exists.
     let type_key = read_article.type_key.as_str();
     let type_ = model.get_type(type_key);
@@ -351,7 +364,8 @@ fn register_article<'a>(model: &'a Model<'a>, classes: &'a Classes<'a>, read_art
         return Err(format!("The article {} already exists.", article_key));
     }
     // Get or create class.
-    let class_key = read_article.class_key.as_str();
+    let local_class_key = read_article.class_key.as_str();
+    let class_key = resolve_alias(aliases, local_class_key);
     let class = if let Some(class) = classes.get_class(class_key) {
         class
     } else {
@@ -443,8 +457,9 @@ impl Name {
 }
 
 /// Register the read links.
-fn update_class_links<'a>(classes: &'a Classes<'a>, read_article: &ReadArticle) -> Result<(), String> {
-    let class_key = &read_article.class_key;
+fn update_class_links<'a>(classes: &'a Classes<'a>, read_article: &ReadArticle, aliases: &HashMap<String, String>) -> Result<(), String> {
+    let local_class_key = read_article.class_key.as_str();
+    let class_key = resolve_alias(aliases, local_class_key);
     let class = classes.get_class(class_key).unwrap(); // Must exist as result of first pass.
     let article_type = class.article_type;
     for (link_type_key, linked_class_keys) in &read_article.links {
@@ -455,7 +470,8 @@ fn update_class_links<'a>(classes: &'a Classes<'a>, read_article: &ReadArticle) 
         }
         let link_type = link_type.unwrap();
         // Register all links of this type.
-        for linked_class_key in linked_class_keys {
+        for local_linked_class_key in linked_class_keys {
+            let linked_class_key = resolve_alias(aliases, local_linked_class_key.as_str());
             let linked_class = classes.get_class(linked_class_key);
             if linked_class.is_none() {
                 return Err(format!("Linked class {} does not exist.", linked_class_key));
@@ -468,8 +484,9 @@ fn update_class_links<'a>(classes: &'a Classes<'a>, read_article: &ReadArticle) 
     for read_names in &read_article.names {
         for read_name in read_names {
             match read_name {
-                ParameterElement::Parameter(_, parameter_class_key) => {
-                    if let Some(parameter_class) = classes.get_class(parameter_class_key.as_str()) {
+                ParameterElement::Parameter(_, local_parameter_class_key) => {
+                    let parameter_class_key = resolve_alias(aliases, local_parameter_class_key.as_str());
+                    if let Some(parameter_class) = classes.get_class(parameter_class_key) {
                         let parameters_link_type = article_type.get_link("Parameters");
                         if parameters_link_type.is_none() {
                             return Err(format!("Parameters link type does not exist for type {}.", &article_type.key));

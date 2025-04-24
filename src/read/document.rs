@@ -1,5 +1,7 @@
 //! Reading of documents.
 
+use std::collections::HashMap;
+use std::hash::Hash;
 use khi::{Dictionary, List, Tagged, Text, Tuple, Value};
 use khi::pdm::{ParsedDictionary, ParsedList, ParsedTaggedValue, ParsedValue, Position};
 use crate::read::article::{read_article_declaration, ReadArticle};
@@ -53,6 +55,24 @@ pub fn read_document(document: &ParsedDictionary) -> Result<ReadDocument, String
     } else {
         vec![]
     };
+    // Read aliases.
+    let aliases = if let Some(aliases) = document.get("Alias") {
+        if !aliases.is_dictionary() {
+            return Err(format!("The Alias section must be a dictionary."));
+        }
+        let aliases = aliases.as_dictionary().unwrap();
+        let mut amap = HashMap::new();
+        for (read_alias, target) in aliases.iter() {
+            if !target.is_text() {
+                return Err(format!("Alias value must be text."));
+            }
+            let target = target.as_text().unwrap().as_str();
+            amap.insert(String::from(read_alias), String::from(target));
+        }
+        amap
+    } else {
+        HashMap::new()
+    };
     // Read document content section.
     let (read_elements, read_articles) = if let Some(parsed_content) = document.get("Content") {
         if !parsed_content.is_list() {
@@ -63,7 +83,7 @@ pub fn read_document(document: &ParsedDictionary) -> Result<ReadDocument, String
     } else {
         (vec![], vec![])
     };
-    Ok(ReadDocument { key, title, description, preamble, resolution_paths, read_elements, read_articles })
+    Ok(ReadDocument { key, title, description, preamble, resolution_paths, read_elements, read_articles, aliases })
 }
 
 pub struct ReadDocument {
@@ -74,6 +94,7 @@ pub struct ReadDocument {
     pub(crate) resolution_paths: Vec<String>,
     pub(crate) read_elements: ReadElements,
     pub(crate) read_articles: Vec<ReadArticle>,
+    pub(crate) aliases: HashMap<String, String>,
 }
 
 //// Resolution paths
