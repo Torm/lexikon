@@ -1,3 +1,5 @@
+//! Key reader for project and article keys.
+
 use std::iter::Peekable;
 use std::str::Chars;
 

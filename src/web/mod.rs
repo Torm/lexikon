@@ -1,13 +1,19 @@
-//! Generation of web content.
-
-use serde_json::Map as JsonMap;
-use serde_json::Value as JsonValue;
+use std::path::Path;
+use serde_json::{Value as JsonValue, Map as JsonMap};
 
 pub mod class;
+pub mod asset;
+pub mod class_style;
 pub mod document;
-pub mod model;
+//pub mod dirpage;
+pub mod index;
+//mod name;
 
-fn json_map_set_string(map: &mut JsonMap<String, JsonValue>, key: impl Into<String>, value: impl Into<String>) {
+pub fn include_index_and_icon(root_path: &Path) -> Result<(), String> {
+    Ok(()) // TODO
+}
+
+pub(crate) fn json_map_set_string(map: &mut JsonMap<String, JsonValue>, key: impl Into<String>, value: impl Into<String>) {
     let key = key.into();
     let value = JsonValue::String(value.into());
     map.insert(key, value);

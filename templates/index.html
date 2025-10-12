@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{TITLE}</title>
+<script src="/assets/static/script.js"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/dark.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<link rel="stylesheet" type="text/css" href="/assets/static/layout.css">
+<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+<body>
+<header><nav>
+  <a href="/">{TITLE}</a>
+</nav></header>
+<main class="main-both">
+  <div id="toolbar">
+    <!--     <div class="menubar-spacer"></div>-->
+    <!--     <div class="menu-container">-->
+    <!--       <button id="sort-by-section-button" class="toolbar-button">S<div class="tooltip">Arrange in sections</div></button>-->
+    <!--       <button id="sort-by-tag-button" class="toolbar-button">T<div class="tooltip">Arrange in tags</div></button>-->
+    <!--     </div>-->
+    <!--    <div class="menubar-spacer"></div>-->
+    <!--    <div class="menu-container">-->
+    <!--      <div id="highlight-off-button" class="toolbar-button">P<div class="tooltip">Highlight: None</div></div>-->
+    <!--      <div id="review-highlight-button" class="toolbar-button">L<div class="tooltip">Highlight: Review</div></div>-->
+    <!--      <div id="highlight-incomplete-button" class="toolbar-button">R<div class="tooltip">Highlight: Incomplete<br><br>Highlight incomplete articles.</div></div>-->
+    <!--    </div>-->
+  </div>
+  <article id="overview-tab"><h1><span>{TITLE}</span></h1>{CONTENT}</article>
+</main>
+<!--<footer></footer>-->
+</body>
+</html>

@@ -1,9 +1,9 @@
-//! Compilation
-
-pub mod compile;
-pub mod model;
-pub mod class;
-pub mod cmd;
+pub mod project;
 pub mod document;
-pub mod key;
-mod dependency;
+pub mod dependency;
+pub mod article;
+pub mod makro;
+pub mod name;
+pub mod style;
+pub mod config;
+pub mod template;

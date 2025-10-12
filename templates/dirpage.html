@@ -11,7 +11,6 @@
 <script>hljs.highlightAll();</script>
 <link rel="stylesheet" type="text/css" href="/assets/static/layout.css">
 <link rel="stylesheet" type="text/css" href="/style.css">
-<script id="resolve-list" type="application/json">{RESOLUTION-PATHS}</script>
 </head>
 <body>
 <header><nav>
@@ -19,11 +18,6 @@
 </nav></header>
 <main class="main-both">
   <div id="toolbar">
-    <div class="menu-container">
-      <button id="label-view-button" class="toolbar-button"><div class="tooltip">Overview</div></button>
-      <button id="both-view-button" class="toolbar-button"><div class="tooltip">Overview & details</div></button>
-      <button id="article-view-button" class="toolbar-button"><div class="tooltip">Details</div></button>
-    </div>
     <!--     <div class="menubar-spacer"></div>-->
     <!--     <div class="menu-container">-->
     <!--       <button id="sort-by-section-button" class="toolbar-button">S<div class="tooltip">Arrange in sections</div></button>-->
@@ -42,20 +36,7 @@
     <!--    </div>-->
   </div>
   <article id="overview-tab"><h1><span>{TITLE}</span></h1>{OVERVIEW}</article>
-  <article id="article-tab"><div id="articles">{DETAILS}</div></article>
 </main>
 <!--<footer></footer>-->
-<div id="progress-panel">
-  <div id="progress-select">
-    <div data-level="0" class="progress-level"><div></div><div>Incomplete</div></div>
-    <div data-level="1" class="progress-level"><div class="level1"></div><div>Complete</div></div>
-  </div>
-  <div id="progress-log">
-    <div class="progress-log-entry"><div class="progress-log-icon level5"></div>2024-Jul-31 (46 hours ago)</div>
-    <div class="progress-log-entry"><div class="progress-log-icon level3"></div>2024-Jul-31 (46 hours ago)</div>
-    <div class="progress-log-entry"><div class="progress-log-icon level4"></div>2024-Jul-31 (46 hours ago)</div>
-    <div class="progress-log-entry"><div class="progress-log-icon level1"></div>2024-Jul-31 (46 hours ago)</div>
-  </div>
-</div>
 </body>
 </html>
