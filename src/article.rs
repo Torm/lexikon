@@ -144,6 +144,8 @@ pub struct Article {
 pub enum ArticleElement {
     Heading { level: u8, markup: Markup },
     Paragraph(Markup),
+    /// Line that indicates separation between two instances of an article in the document.
+    LocalSeparator,
 }
 
 impl Article {

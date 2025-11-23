@@ -118,7 +118,12 @@ fn generate_links_panel(styles: &Styles, resolve_paths: &ResolutionPaths, articl
                 }
             }
             PanelElement::ArticleLink { key, index } => {
-                let article = articles.article_map.get(key).unwrap();
+                let article = if let Some(a) = articles.article_map.get(key) {
+                    a
+                } else {
+                    eprintln!("Could not find article with key {}", key);
+                    panic!();
+                };
                 generate_article_link(styles, html, &article.borrow(), index.as_ref());
             }
             PanelElement::ClassLink { key, index } => {

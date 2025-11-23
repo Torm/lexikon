@@ -481,7 +481,7 @@ impl<M: MacroMap> Writer<'_, M> {
                     if num == 0 || num > parameters.len() {
                         return Err(format!("Parameter input number n in <n> must be between 1 and {}, found {}.", parameters.len(), num));
                     }
-                    let argument = parameters[num].clone();
+                    let argument = parameters[num - 1].clone();
                     *parametrization = argument;
                 } else {
                     let tuple = &mut tag.tuple;

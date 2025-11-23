@@ -123,6 +123,9 @@ pub(crate) fn generate_article_content(html: &mut Vec<u8>, content: &[ArticleEle
             ArticleElement::Paragraph(text) => {
                 html.extend_from_slice(&format!(r#"{}"#, text.0.as_str()).as_bytes());
             }
+            ArticleElement::LocalSeparator => {
+                html.extend_from_slice("<hr>".as_bytes());
+            }
         }
     }
 }

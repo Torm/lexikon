@@ -168,6 +168,7 @@ function init() {
         openClassDialog(key, x, y);
     });
     // Click label header - Open article
+    // Hold Ctrl + Click - Close article
     document.addEventListener("click", event => {
         let element = event.target;
         while (element.matches(".link > .header *")) {
@@ -176,7 +177,11 @@ function init() {
         if (!element.matches(".link > .header")) return;
         let label = element.parentElement;
         let key = label.getAttribute("data-article");
-        openPrerenderedArticle(key);
+        if (!event.ctrlKey) {
+            openPrerenderedArticle(key);
+        } else {
+            closeArticleByKey(key);
+        }
     });
     // Click outside class dialog - delete dialog.
     document.addEventListener("click", event => {
@@ -230,6 +235,7 @@ function init() {
         html.innerHTML = getArticleFullNameHtml(articleData.names[0]);
         createTooltip(event.target, html);
     });
+
     document.addEventListener("mouseover", event => {
         let target = event.target;
         let tooltip = target.querySelector(".tooltip:not(.temp)");
@@ -241,16 +247,37 @@ function init() {
         tooltip.style.left = box.right + "px";
         activeTooltip = tooltip;
     });
-
-    document.addEventListener("mouseout", event => {
+    // Clear tooltip if moving mouse off the element.
+    document.addEventListener("mouseover", event => {
         if (activeTooltip === null) return;
         let parent = activeTooltip.parentElement;
         let target = event.target;
-        if (parent !== target) return;
+        while (target !== null) {
+            if (parent === target) return;
+            target = target.parentElement;
+        }
         clearTooltip();
     });
-    document.addEventListener("mouseover", handleLinkGroupTooltip);
-    document.addEventListener("click", handleArticleLinkFollow);
+    document.addEventListener("mouseover", handleLinkGroupTooltip); // Deprecated
+    document.addEventListener("click", handleArticleLinkFollow); // Click on article link.
+    /// Article link hover.
+    document.addEventListener("mouseover", event => {
+        let target = event.target;
+        if (!target.matches(".link") && !target.matches(".link *")) return;
+        while (!target.matches(".link")) {
+            target = target.parentElement;
+        }
+        let key = target.getAttribute("data-article");
+        let prerender = prerenders.get(key);
+        let name = prerender.querySelector("article > header > hgroup > h1");
+        if (name === null) return;
+        let div = document.createElement("div");
+        div.classList.add("serif");
+        for (let c of name.childNodes) {
+            div.appendChild(c.cloneNode(true));
+        }
+        createTooltip(target, div);
+    });
 }
 
 /**
@@ -316,7 +343,7 @@ async function readModel() {
 function clearTooltip() {
     if (activeTooltip === null) return;
     if (activeTooltip.classList.contains("temp")) {
-        activeTooltip.parentElement.removeChild(activeTooltip);
+        activeTooltip.remove();
     } else {
         activeTooltip.style.display = null;
     }
@@ -456,6 +483,11 @@ function touchLabels() {
         let key = label.getAttribute("data-article");
         if (openArticles.count(key) > 0) {
             label.classList.add("open");
+        }
+        let prerender = prerenders.get(key);
+        let content = prerender.querySelector(".content");
+        if (content === null || content.childNodes.length === 0) {
+            label.classList.add("empty");
         }
     }
 }
@@ -608,7 +640,7 @@ function openPrerenderedArticle(key) {
     // Add the article to the openArticles map.
     openArticles.insert(key, rendered);
     // Add the open class to the labels of this article.
-    let labels = document.getElementsByClassName("label");
+    let labels = document.getElementsByClassName("link");
     for (let label of labels) {
         if (key !== label.getAttribute("data-article")) continue;
         label.classList.add("open");
@@ -633,10 +665,18 @@ function closeArticle(key, element) {
     openArticles.delete(key, element);
     // Remove the open class from the labels if all of these articles have been closed.
     if (openArticles.count(key) !== 0) return;
-    let labels = document.getElementsByClassName("label");
+    let labels = document.getElementsByClassName("link");
     for (let label of labels) {
         if (key !== label.getAttribute("data-article")) continue;
         label.classList.remove("open");
+    }
+}
+
+function closeArticleByKey(key) {
+    for (let article of document.getElementsByClassName("article")) {
+        if (article.getAttribute("data-article") === key) {
+            closeArticle(key, article);
+        }
     }
 }
 
@@ -1158,9 +1198,15 @@ function createTooltip(target, content) {
     tooltip.classList.add("tooltip");
     tooltip.classList.add("temp");
     if (typeof content === "string") {
-        content = document.createTextNode(content);
+        tooltip.appendChild(document.createTextNode(content));
+    } else if (content instanceof NodeList) {
+        for (let c of content) {
+            tooltip.appendChild(c.cloneNode(true));
+        }
+    } else {
+        tooltip.appendChild(content.cloneNode(true));
     }
-    tooltip.appendChild(content);
+    MathJax.typeset([tooltip]);
     let box = target.getBoundingClientRect();
     if (box.left < document.defaultView.innerWidth / 2.0) {
         tooltip.style.left = box.right + "px";
@@ -1172,6 +1218,7 @@ function createTooltip(target, content) {
     tooltip.style.display = "block";
     target.appendChild(tooltip);
     activeTooltip = tooltip;
+    return activeTooltip;
 }
 
 function setupStaticTooltips() {

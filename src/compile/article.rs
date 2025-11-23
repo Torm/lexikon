@@ -122,20 +122,27 @@ pub fn read_article<'a>(
     if positionals.len() != 0 {
         return Err(format!("More arguments than expected in article at {}:{}.", at.line, at.column));
     }
-    // Register article. Check that it does not already exist.
+    // Register article. If it exists, create a separator. // TODO: Warn behind document flag/pragma
     if let Some(article) = registry.article_map.get(&article_key) {
-        return Err(format!("Article {} already registered.", &article_key));
+        let mut iarticle = article.borrow_mut();
+        iarticle.names.extend(names);
+        iarticle.content.push(ArticleElement::LocalSeparator);
+        iarticle.content.extend(content);
+        eprintln!("[Warning] Article {} has multiple instances.", iarticle.key.as_ref()); // TODO PRAGMA
+        Ok(article.clone())
+    } else {
+        let article = Article { key: article_key.clone(), class: Rc::downgrade(&class), names, content };
+        let article = Rc::new(RefCell::new(article));
+        registry.article_map.insert(article_key, article.clone());
+        // Register article in class.
+        {
+            let mut class = class.borrow_mut();
+            class.articles.push(Rc::downgrade(&article));
+        }
+        //
+        Ok(article)
     }
-    let article = Article { key: article_key.clone(), class: Rc::downgrade(&class), names, content };
-    let article = Rc::new(RefCell::new(article));
-    registry.article_map.insert(article_key, article.clone());
-    // Register article in class.
-    {
-        let mut class = class.borrow_mut();
-        class.articles.push(Rc::downgrade(&article));
-    }
-    //
-    Ok(article)
+
 }
 
 fn remove_first<T>(vec: &mut Vec<T>) -> Option<T> {

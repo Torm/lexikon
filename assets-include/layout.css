@@ -5,6 +5,11 @@
 /*  padding: 0.10em;*/
 /*}*/
 
+
+.serif * {
+    font-family: serif;
+}
+
 :root {
     --article-border-colour: #ffffff0d;
     --article-border-size: 1px;
@@ -366,7 +371,7 @@ main.main-details {
     position: absolute;
     bottom: -2px;
     right: -1px;
-    color: rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 100%);
 }
 
 /* Label inner content (right inner content when symbol present) */

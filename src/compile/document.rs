@@ -177,6 +177,20 @@ pub fn read_document_khidict(templates: &Templates, documents: &mut Vec<Document
     } else {
         vec![]
     };
+    // Warn document // TODO PRAGMA
+    for delem in structure.iter() {
+        if let DocumentElement::Panel(elements) = delem {
+            for el in elements.iter() {
+                if let PanelElement::ArticleLink { key, .. } = el {
+                    let article_ref = registry.get_article(key).unwrap();
+                    let article = article_ref.borrow_mut();
+                    if article.content.is_empty() {
+                        eprintln!("[Warning] Article {} has no content.", key); // TODO PRAGMA
+                    }
+                }
+            }
+        }
+    }
     // Register document.
     let dir_crumbs = crumbs.clone();
     let file_name = String::from(file_name);
