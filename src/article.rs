@@ -5,6 +5,7 @@ use std::rc::{Rc, Weak};
 use crate::relation::Relation;
 use crate::markup::Markup;
 use crate::name::Name;
+use crate::types::ArticleMeta;
 
 pub struct Articles {
     pub class_map: HashMap<Rc<str>, Rc<RefCell<Class>>>,
@@ -137,6 +138,7 @@ pub struct Article {
     pub(crate) class: Weak<RefCell<Class>>,
     pub(crate) names: Vec<Name>,
     pub(crate) content: Vec<ArticleElement>,
+    pub(crate) metadata: ArticleMeta,
 }
 
 /// Element of article content.

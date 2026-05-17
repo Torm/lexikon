@@ -1,8 +1,8 @@
 use std::fmt::Write;
-use khi::{Catenation, Dictionary, Element, List, ParsedTupleElement, Tagged, Text, Tuple, Value};
-use khi::parse::pdm::{ParsedList, ParsedTaggedValue, ParsedText, ParsedTuple, ParsedValue, Position};
+use khi::{Catenation, Dictionary, Element, List, TaggedTuple, Text, TupleElement, Value};
+use khi::parse::pdm::{ParsedList, ParsedTaggedTuple, ParsedText, ParsedValue, Position};
 use crate::makro::{MacroMap};
-use crate::{tuple_split, tuple_splite};
+use crate::{tuple_split};
 
 pub struct Writer<'a, M: MacroMap> {
     pub(crate) output: &'a mut String,
@@ -272,7 +272,7 @@ impl<M: MacroMap> Writer<'_, M> {
                         Element::Element(solid) => {
                             self.write_inner(solid);
                         }
-                        Element::Whitespace => {
+                        Element::Separator => {
                             self.break_opportunity(*at);
                             self.push(' ');
                         }
@@ -280,18 +280,19 @@ impl<M: MacroMap> Writer<'_, M> {
                 };
                 self.push('}');
             }
-            ParsedValue::Tuple(tuple, at, _) => {
-                if tuple.len() == 0 {
-                    self.break_opportunity(*at);
-                    self.push('{');
-                    self.push('}');
+            ParsedValue::TaggedTuple(tag, at, _) => {
+                if (tag.name() == None) {
+                    if (tag.len() == 0) {
+                        self.break_opportunity(*at);
+                        self.push('{');
+                        self.push('}');
+                    } else {
+                        return Err(PreprocessorError::IllegalTuple(*at));
+                    }
                 } else {
-                    return Err(PreprocessorError::IllegalTuple(*at));
+                    self.break_opportunity(*at);
+                    self.write_command(tag, *at)?;
                 }
-            }
-            ParsedValue::Tagged(tag, at, _) => {
-                self.break_opportunity(*at);
-                self.write_command(tag, *at)?;
             }
         }
         Ok(())
@@ -299,8 +300,11 @@ impl<M: MacroMap> Writer<'_, M> {
 
     fn write_tabulation(&mut self, list: &ParsedList, at: Position) -> Result<(), PreprocessorError> {
         for element in list.iter() {
-            let mut columns = element.iter_as_tuple();
-            let (columns, opts) = tuple_splite(columns);
+            let (columns, opts) = if let Some(t) = element.as_tagged_tuple() {
+                tuple_split(t)
+            } else {
+                (vec![element], vec![])
+            };
             let mut columns = columns.iter();
             if let Some(c) = columns.next() {
                 self.write_inner(&c)?;
@@ -316,10 +320,9 @@ impl<M: MacroMap> Writer<'_, M> {
     }
 
     /// A command may be a user-defined macro or a special built in.
-    fn write_command(&mut self, tag: &ParsedTaggedValue, at: Position) -> Result<(), PreprocessorError> {
-        let mut name = tag.name();
-        let tuple = tag.get();
-        let (tuple, opts) = tuple_split(tuple);
+    fn write_command(&mut self, tag: &ParsedTaggedTuple, at: Position) -> Result<(), PreprocessorError> {
+        let mut name = tag.name().unwrap();
+        let (tuple, opts) = tuple_split(tag);
         if let Some(m ) = self.macros.get(name) {
             if m.arity as usize != tuple.len() {
                 return Err(PreprocessorError::MacroError(at, format!("Macro <{name}> takes {} arguments but got only {} arguments.", m.arity, tuple.len())));
@@ -407,10 +410,7 @@ impl<M: MacroMap> Writer<'_, M> {
                             self.write_inner(&argument)?;
                             self.push(']');
                         }
-                        ParsedValue::Tuple(tuple, at, _) => {
-                            return Err(PreprocessorError::IllegalTuple(*at));
-                        }
-                        ParsedValue::Tagged(tag, at, to) => {
+                        ParsedValue::TaggedTuple(tag, at, to) => {
                             self.break_opportunity(*at);
                             self.push('[');
                             self.write_command(&tag, *at)?;
@@ -451,12 +451,9 @@ impl<M: MacroMap> Writer<'_, M> {
                         self.write_inner(&argument)?;
                         self.push('}');
                     }
-                    ParsedValue::Tuple(_, at, _) => {
-                        return Err(PreprocessorError::IllegalTuple(*at));
-                    }
-                    ParsedValue::Tagged(t, at, to) => {
+                    ParsedValue::TaggedTuple(t, at, to) => {
                         self.break_opportunity(*at);
-                        if t.get().is_empty() {
+                        if t.is_empty() {
                             self.write_command(&t, *at)?;
                         } else {
                             self.push('{');
@@ -476,19 +473,17 @@ impl<M: MacroMap> Writer<'_, M> {
     fn expand_value(&mut self, parametrization: &mut ParsedValue, parameters: &[&ParsedValue]) -> Result<(), String> {
         match parametrization {
             ParsedValue::Text(..) => {}
-            ParsedValue::Tagged(tag, ..) => {
-                if let Ok(num) = tag.name.parse::<usize>() {
+            ParsedValue::TaggedTuple(tag, ..) => {
+                if let Ok(num) = tag.name().unwrap().parse::<usize>() {
                     if num == 0 || num > parameters.len() {
                         return Err(format!("Parameter input number n in <n> must be between 1 and {}, found {}.", parameters.len(), num));
                     }
                     let argument = parameters[num - 1].clone();
                     *parametrization = argument;
                 } else {
-                    let tuple = &mut tag.tuple;
-                    self.expand_tuple(tuple, parameters)?;
+                    self.expand_tuple(tag, parameters)?;
                 }
             }
-            ParsedValue::Tuple(tuple, ..) => self.expand_tuple(tuple, parameters)?,
             ParsedValue::Dictionary(dictionary, _, _) => {
                 for entry in dictionary.iter_mut() {
                     self.expand_value(entry.1, parameters)?;
@@ -503,7 +498,7 @@ impl<M: MacroMap> Writer<'_, M> {
                 for element in catenation.iter_mut() {
                     match element {
                         Element::Element(e) => self.expand_value(e, parameters)?,
-                        Element::Whitespace => {}
+                        Element::Separator => {}
                     }
                 }
             }
@@ -512,11 +507,11 @@ impl<M: MacroMap> Writer<'_, M> {
         Ok(())
     }
 
-    fn expand_tuple(&mut self, parametrized_tuple: &mut ParsedTuple, parameters: &[&ParsedValue]) -> Result<(), String> {
+    fn expand_tuple(&mut self, parametrized_tuple: &mut ParsedTaggedTuple, parameters: &[&ParsedValue]) -> Result<(), String> {
         for element in parametrized_tuple.iter_mut() {
             match element {
-                ParsedTupleElement::Element(v) => self.expand_value(v, parameters)?,
-                ParsedTupleElement::NamedElement(k, v) => self.expand_value(v, parameters)?,
+                TupleElement::Positional(mut v) => self.expand_value(&mut v, parameters)?,
+                TupleElement::Named(k, mut v) => self.expand_value(&mut v, parameters)?,
             }
         }
         Ok(())

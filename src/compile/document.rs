@@ -3,9 +3,9 @@ use std::fs::{read_dir, File};
 use std::io::Read;
 use std::path::{Path};
 use std::rc::Rc;
-use khi::{Dictionary, List, Tagged, Text, Tuple, Value};
+use khi::{Dictionary, List, TaggedTuple, Text, Value};
 use khi::parse::parse::parse_dictionary_str;
-use khi::parse::pdm::{ParsedDictionary, ParsedList, ParsedTaggedValue, Position};
+use khi::parse::pdm::{ParsedDictionary, ParsedList, ParsedTaggedTuple, Position};
 use crate::article::{Articles};
 use crate::compile::article::{read_article};
 use crate::compile::makro::{read_macro_definitions_list};
@@ -15,7 +15,7 @@ use crate::document::{DirCrumb, Document, DocumentElement, PanelElement};
 use crate::file::{read_excludable_file_to_string, read_file_content_to_dictionary};
 use crate::makro::{LocalMacroRegistry, MacroMap, Macros};
 use crate::key::KeyReader;
-use crate::markup::{process_markup, Markup};
+use crate::markup::{process_unexpanded_markup, Markup};
 use crate::tuple_split;
 
 /// Directory configuration. Stored in dir.khi files. Only contains Directory name at the moment.
@@ -77,8 +77,8 @@ fn read_document_dir(templates: &Templates, resolution_paths: &ResolutionPaths, 
         if entry_type.is_file() {
             if file_name.as_encoded_bytes().ends_with(b".document.khi") || file_name.as_encoded_bytes().ends_with(b".doc.khi") {
                 let document_path = path.join(&file_name);
+                eprintln!("Reading document file {}", document_path.to_str().unwrap());
                 read_document_file(templates, documents, data, macros, DependencyInclude::All, crumb_buffer, file_name.to_str().unwrap(), &document_path)?;
-                eprintln!("Read document file {}", document_path.to_str().unwrap());
             }
         } else if entry_type.is_dir() {
             let dir_path = path.join(&file_name);
@@ -211,14 +211,13 @@ fn read_content_section(
     let mut elements = vec![];
     let mut heading_level = 1; // Keep track of heading level to prevent bad sectioning structure.
     for entry in content_list.iter() {
-        if !entry.is_tagged() {
+        if !entry.is_tagged_tuple() {
             return Err(format!("Element at {}:{} must be a tagged value", entry.from().line, entry.from().column));
         }
-        let tag = entry.as_tagged().unwrap();
+        let tag = entry.as_tagged_tuple().unwrap();
         let at = entry.from();
-        let name = tag.name.as_ref();
-        let tuple = tag.get();
-        let (tuple, opts) = tuple_split(tuple);
+        let name = tag.name().unwrap();
+        let (tuple, opts) = tuple_split(tag);
         if name == "H1" || name == "H2" || name == "H3" || name == "H4" || name == "H5" || name == "H6" {
             let HeadingElement { level, heading, index, inline } = read_heading_element(macro_map, tag)?;
             if level > heading_level + 1 {
@@ -235,7 +234,7 @@ fn read_content_section(
                 return Err(format!("<P> takes 1 argument."));
             }
             let argument = tuple.get(0).unwrap();
-            elements.push(DocumentElement::Paragraph(process_markup(macro_map, argument)?));
+            elements.push(DocumentElement::Paragraph(process_unexpanded_markup(macro_map, argument)?));
         } else if name == "@" {
             let include = read_include_element(aliases, tag, at, document_key)?;
             append_paneled_element(&mut elements, include)?;
@@ -331,17 +330,16 @@ struct HeadingElement {
 /// Read a heading command in document contents.
 ///
 /// (level, heading, index, inline)
-fn read_heading_element(macros: &impl MacroMap, tag: &ParsedTaggedValue) -> Result<HeadingElement, String> {
-    let command = tag.name.as_ref();
-    let tuple = tag.get();
-    let (positional, named) = tuple_split(tuple);
-    let (index, heading) = if tuple.len() == 2 {
+fn read_heading_element(macros: &impl MacroMap, tag: &ParsedTaggedTuple) -> Result<HeadingElement, String> {
+    let command = tag.name().unwrap();
+    let (positional, named) = tuple_split(tag);
+    let (index, heading) = if tag.len() == 2 {
         let index = positional.get(0).unwrap();
         if !index.is_text() { return Err(format!("Heading at {}:{} must be tuple with 1 or 2 elements.", "?", "?")) } // TODO .at()
         let index = index.as_text().unwrap().as_str().to_string();
         let heading = Markup::from_markup(macros, positional.get(1).unwrap())?;
         (Some(index), heading)
-    } else if tuple.len() == 1 {
+    } else if tag.len() == 1 {
         let heading = Markup::from_markup(macros, positional.get(0).unwrap())?;
         (None, heading)
     } else {
@@ -360,7 +358,7 @@ fn read_heading_element(macros: &impl MacroMap, tag: &ParsedTaggedValue) -> Resu
     Ok(heading)
 }
 
-fn read_article_element(templates: &Templates, registry: &mut Articles, aliases: &HashMap<String, String>, macros: &impl MacroMap, tag: &ParsedTaggedValue, at: Position, document_key: &str) -> Result<PanelElement, String> {
+fn read_article_element(templates: &Templates, registry: &mut Articles, aliases: &HashMap<String, String>, macros: &impl MacroMap, tag: &ParsedTaggedTuple, at: Position, document_key: &str) -> Result<PanelElement, String> {
     let read_article = read_article(templates, macros, registry, tag, at, document_key)?;
     let key = read_article.borrow().key.clone();
     let element = PanelElement::ArticleLink { key, index: None };
@@ -370,9 +368,8 @@ fn read_article_element(templates: &Templates, registry: &mut Articles, aliases:
 /// Read an article inclusion in document content.
 ///
 /// Either a class key or an article key must be specified.
-fn read_include_element(aliases: &HashMap<String, String>, tag: &ParsedTaggedValue, at: Position, document_key: &str) -> Result<PanelElement, String> {
-    let include_key = tag.get();
-    let (include_key, named) = tuple_split(include_key);
+fn read_include_element(aliases: &HashMap<String, String>, tag: &ParsedTaggedTuple, at: Position, document_key: &str) -> Result<PanelElement, String> {
+    let (include_key, named) = tuple_split(tag);
     if include_key.len() != 1 {
         return Err(format!("Content include takes 1 key argument."));
     }

@@ -12,12 +12,12 @@ pub fn read_configuration_files(templates: &mut Templates, macros: &mut Macros, 
             let file_name = path.file_name().unwrap();
             if file_name.as_encoded_bytes().ends_with(b".macros.khi") {
                 let file_path = path.join(&file_name);
+                eprintln!("Reading macro definition file {}", file_path.display());
                 read_macro_definition_file(macros, &file_path)?;
-                eprintln!("Read macro definition file {}", file_path.display());
             } else if file_name.as_encoded_bytes().ends_with(b".templates.khi") {
                 let file_path = path.join(&file_name);
+                eprintln!("Reading template file {}", file_path.display());
                 read_template_file(templates, &file_path)?;
-                eprintln!("Read template file {}", file_path.display());
             } else {
                 return Err(format!("Configuration file {} must be either a .macros.khi or a .templates.khi file.", file_name.to_str().unwrap()));
             }

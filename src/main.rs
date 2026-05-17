@@ -11,29 +11,26 @@ mod markup;
 mod strings;
 mod style;
 pub mod relation;
+mod types;
 
 use std::{env, fs};
 use std::path::Path;
-use std::slice::Iter;
-use khi::{Dictionary, ParsedTupleElement, Text, Tuple, Value};
-use khi::parse::pdm::{ParsedDictionary, ParsedTuple, ParsedValue};
+use khi::{Dictionary, TaggedTuple, Text, TupleElement, Value};
+use khi::parse::pdm::{ParsedDictionary, ParsedTaggedTuple, ParsedTupleElement, ParsedValue};
 use zeroarg::{parse_arguments, Argument};
 use crate::article::Articles;
-use crate::compile::dependency;
 use crate::compile::config::read_configuration_files;
 use crate::compile::document::read_source_dir;
 use crate::compile::project::{read_project_file, ProjectSettings};
 use crate::compile::style::{read_style_file};
 use crate::compile::template::Templates;
 use crate::document::Documents;
-use crate::file::carry_modification_dates;
 use crate::makro::Macros;
 use crate::style::Styles;
 use crate::web::asset::{include_assets, include_static_assets};
 use crate::web::class::write_class_directory;
 use crate::web::class_style::{write_class_style_css_file, write_class_style_json_file};
 use crate::web::document::write_documents;
-use crate::web::index::write_index;
 
 type Html = String;
 
@@ -158,19 +155,15 @@ pub fn read_text_value_or_err(dictionary: &ParsedDictionary, key: &str) -> Resul
     Ok(String::from(v.as_str()))
 }
 
-pub fn tuple_split(tuple: &ParsedTuple) -> (Vec<&ParsedValue>, Vec<(&str, &ParsedValue)>) {
-    tuple_splite(tuple.iter())
-}
-
-pub fn tuple_splite<'a>(tuple: impl Iterator<Item=ParsedTupleElement<'a, &'a ParsedValue>>) -> (Vec<&'a ParsedValue>, Vec<(&'a str, &'a ParsedValue)>) {
+pub fn tuple_split(tuple: &ParsedTaggedTuple) -> (Vec<&ParsedValue>, Vec<(&str, &ParsedValue)>) {
     let mut positional = vec![];
     let mut named = vec![];
-    for element in tuple.into_iter() {
+    for element in tuple.iter() {
         match element {
-            ParsedTupleElement::Element(e) => {
+            TupleElement::Positional(e) => {
                 positional.push(e);
             }
-            ParsedTupleElement::NamedElement(n, e) => {
+            TupleElement::Named(n, e) => {
                 named.push((n, e));
             }
         }

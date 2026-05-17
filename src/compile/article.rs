@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use khi::{Dictionary, List, Tagged, Text, Value};
-use khi::parse::pdm::{ParsedDictionary, ParsedTaggedValue, ParsedValue, Position};
+use khi::{Dictionary, List, TaggedTuple, Text, Value};
+use khi::parse::pdm::{ParsedDictionary, ParsedTaggedTuple, ParsedValue, Position};
 use crate::article::{Article, ArticleElement, Class, Articles, verify_parameter_match};
 use crate::relation::{RelationClass};
 use crate::compile::template::{read_relation_list, read_relation_term_value, Templates};
@@ -11,24 +11,25 @@ use crate::key::KeyReader;
 use crate::tex::{write_tex_with, BreakMode};
 use crate::{tex_error_to_text, tuple_split};
 use crate::compile::name::read_names;
-use crate::markup::{process_markup, Markup};
+use crate::markup::{process_unexpanded_markup, Markup};
+use crate::types::ArticleMeta;
 
 /// Read an article definition.
 pub fn read_article<'a>(
     templates: &Templates,
     macros: &impl MacroMap,
     registry: &mut Articles,
-    tag: &'a ParsedTaggedValue,
+    tag: &'a ParsedTaggedTuple,
     at: Position,
     document_key: &str,
 ) -> Result<Rc<RefCell<Article>>, String> {
-    let template_key = tag.name.to_string();
+    let template_key = tag.name().unwrap().to_string();
     let template = if let Some(template) = templates.get(&template_key) {
         template
     } else {
         return Err(format!("Template {} is not registered.", &template_key));
     };
-    let (mut positionals, named) = tuple_split(tag.get());
+    let (mut positionals, named) = tuple_split(tag);
     // Extract key.
     let (class_key, article_key) = if let Some(key) = remove_first(&mut positionals) {
         if !key.is_text() {
@@ -101,6 +102,75 @@ pub fn read_article<'a>(
     }
     // Handle arguments to template.
     for (k, v) in named {
+        // // TODO Temporary test. These names are hardcoded.
+        // if (k == "Defines") {
+        //     if !v.is_list() {
+        //         return Err(format!("Template argument at {}:{} must be a list.", at.line, at.column));
+        //     }
+        //     let args = v.as_list().unwrap();
+        //     for arg in args.iter() {
+        //         if !arg.is_tagged_tuple() {
+        //             return Err(format!("Defined notion in {}:{} must be a tuple.", arg.from().line, arg.from().column));
+        //         }
+        //         let tuple = arg.as_tagged_tuple().unwrap();
+        //         if tuple.len() != 2 {
+        //             return Err(format!("Defined notion in {}:{} must have a key and a names element.", arg.from().line, arg.from().column));
+        //         }
+        //         let key = read_article_key_declaration(tuple.get(0).unwrap())?;
+        //         let name = read_names(macros, tuple.get(1).unwrap())?;
+        //     }
+        // } else if (k == "States") {
+        //     if !v.is_list() {
+        //         return Err(format!("Template argument at {}:{} must be a list.", at.line, at.column));
+        //     }
+        //     let args = v.as_list().unwrap();
+        //     for arg in args.iter() {
+        //         if !arg.is_tagged_tuple() {
+        //             return Err(format!("Defined notion in {}:{} must be a tuple.", arg.from().line, arg.from().column));
+        //         }
+        //         let tuple = arg.as_tagged_tuple().unwrap();
+        //         if tuple.len() != 2 {
+        //             return Err(format!("Defined notion in {}:{} must have a key and a names element.", arg.from().line, arg.from().column));
+        //         }
+        //         let key = read_article_key_declaration(tuple.get(0).unwrap())?;
+        //         let name = read_names(macros, tuple.get(1).unwrap())?;
+        // 
+        //     }
+        // } else if (k == "Proves") {
+        //     if !v.is_list() {
+        //         return Err(format!("Template argument at {}:{} must be a list.", at.line, at.column));
+        //     }
+        //     let args = v.as_list().unwrap();
+        //     for arg in args.iter() {
+        //         if !arg.is_tagged_tuple() {
+        //             return Err(format!("Defined notion in {}:{} must be a tuple.", arg.from().line, arg.from().column));
+        //         }
+        //         let tuple = arg.as_tagged_tuple().unwrap();
+        //         if tuple.len() != 2 {
+        //             return Err(format!("Defined notion in {}:{} must have a key and a names element.", arg.from().line, arg.from().column));
+        //         }
+        //         let key = read_article_key_declaration(tuple.get(0).unwrap())?;
+        //         let name = read_names(macros, tuple.get(1).unwrap())?;
+        // 
+        //     }
+        // } else if (k == "Infers") {
+        //     if !v.is_list() {
+        //         return Err(format!("Template argument at {}:{} must be a list.", at.line, at.column));
+        //     }
+        //     let args = v.as_list().unwrap();
+        //     for arg in args.iter() {
+        //         if !arg.is_tagged_tuple() {
+        //             return Err(format!("Defined notion in {}:{} must be a tuple.", arg.from().line, arg.from().column));
+        //         }
+        //         let tuple = arg.as_tagged_tuple().unwrap();
+        //         if tuple.len() != 2 {
+        //             return Err(format!("Defined notion in {}:{} must have a key and a names element.", arg.from().line, arg.from().column));
+        //         }
+        //         let key = read_article_key_declaration(tuple.get(0).unwrap())?;
+        //         let name = read_names(macros, tuple.get(1).unwrap())?;
+        // 
+        //     }
+        // } else
         if let Some(argument_relations) = template.argument_relations.get(k) {
             if !v.is_list() {
                 return Err(format!("Template argument at {}:{} must be a list.", at.line, at.column));
@@ -131,7 +201,7 @@ pub fn read_article<'a>(
         eprintln!("[Warning] Article {} has multiple instances.", iarticle.key.as_ref()); // TODO PRAGMA
         Ok(article.clone())
     } else {
-        let article = Article { key: article_key.clone(), class: Rc::downgrade(&class), names, content };
+        let article = Article { key: article_key.clone(), class: Rc::downgrade(&class), names, content, metadata: ArticleMeta::Generic };
         let article = Rc::new(RefCell::new(article));
         registry.article_map.insert(article_key, article.clone());
         // Register article in class.
@@ -218,26 +288,26 @@ pub fn process_article_content(macros: &impl MacroMap, input: &ParsedValue) -> R
     if input.is_list() {
         let content = input.as_list().unwrap();
         for c in content.iter() {
-            if !c.is_tagged() {
+            if !c.is_tagged_tuple() {
                 // return Err(format!("Element of article content list at {}:{} must be a tagged value", c.from().line, c.from().column));
                 // TODO: Below is very temporary workaround.
-                let txt = process_markup(macros, c)?;
+                let txt = process_unexpanded_markup(macros, c)?;
                 article_elements.push(ArticleElement::Paragraph(Markup::raw(&format!(r#"<p>{}</p>"#, &txt.0)))); // TODO Use Paragraph but wrap in div not p?
                 continue;
             }
-            let tag = c.as_tagged().unwrap();
-            let (tuple, opts) = tuple_split(tag.get());
-            let name = tag.name.as_ref();
+            let tag = c.as_tagged_tuple().unwrap();
+            let (tuple, opts) = tuple_split(tag);
+            let name = tag.name().unwrap();
             if name == "H1" || name == "H2" || name == "H3" || name == "H4" || name == "H5" || name == "H6" { // TODO: Not allowed, + check levels, check in compilation?
                 let level = match name {
                     "H1" => return Err(format!("H1 heading not allowed in article at {}:{}.", input.from().line, input.from().column)),
                     "H2" => 2, "H3" => 3, "H4" => 4, "H5" => 5, "H6" => 6,
                     _ => unreachable!(),
                 };
-                let tex = process_markup(macros, tuple.get(0).unwrap())?;
+                let tex = process_unexpanded_markup(macros, tuple.get(0).unwrap())?;
                 article_elements.push(ArticleElement::Heading { level, markup: tex });
             } else if name == "P" {
-                let tex = process_markup(macros, tuple.get(0).unwrap())?;
+                let tex = process_unexpanded_markup(macros, tuple.get(0).unwrap())?;
                 article_elements.push(ArticleElement::Paragraph(tex));
             } else if name == "$$" {
                 let tex = write_tex_with(tuple.get(0).unwrap(), macros, BreakMode::Never).or_else(tex_error_to_text)?;
@@ -269,11 +339,14 @@ pub fn process_article_content(macros: &impl MacroMap, input: &ParsedValue) -> R
             //     html.push_str("</ul>");
             //     article_elements.push(ArticleElement::Html(html));
             } else {
-                return Err(format!("Element of article content list at {}:{} must be a heading or paragraph.", c.from().line, c.from().column));
+                // return Err(format!("Element of article content list at {}:{} must be a heading or paragraph.", c.from().line, c.from().column));
+                // TODO Here, if no article formatting command is found, we just delegate to reading markup.
+                let tex = process_unexpanded_markup(macros, tuple.get(0).unwrap())?;
+                article_elements.push(ArticleElement::Paragraph(tex));
             }
         }
     } else {
-        let tex = process_markup(macros, input)?;
+        let tex = process_unexpanded_markup(macros, input)?;
         article_elements.push(ArticleElement::Paragraph(tex));
     }
     Ok(article_elements)

@@ -54,9 +54,9 @@ class Buckets {
 let progress = new Map();
 
 /**
- * Key of last clicked article. Used to store the subject of a context menu.
+ * Key of last clicked article. Used to store the target of a context menu.
  */
-let lastClickedKey = null;
+let progressPanelTarget = null;
 
 /**
  * The progress types found in this document.
@@ -111,6 +111,43 @@ function init() {
 
     touchLabels();
 
+    // Open progress panel on right clicking link progress.
+    document.addEventListener("contextmenu", event => {
+        let element = event.target;
+        while (true) {
+            if (element === null) return;
+            if (!element.matches(".link > .progress-box")) {
+                element = element.parentElement;
+            } else {
+                break;
+            }
+        }
+        let link = element.parentElement;
+        let key = link.getAttribute("data-article");
+        if (key == null) return;
+        if (getSelection().type === "Range") {
+            return;
+        }
+        progressPanelTarget = key;
+        event.preventDefault();
+        placeProgressPanel(key, link);
+    });
+    // Progress box click event
+    document.addEventListener("click", event => {
+        let element = event.target;
+        while (true) {
+            if (element === null) return;
+            if (!element.matches("#progress-panel > #progress-select > .progress-level")) {
+                element = element.parentElement;
+            } else {
+                break;
+            }
+        }
+        if (progressPanelTarget === null) return;
+        let l = element.getAttribute("data-level");
+        setProgress(progressPanelTarget, l, new Date());
+        fillProgressLog(progressPanelTarget);
+    });
     // Click article header - Expand/collapse article
     document.addEventListener("click", event => {
         let element = event.target;
@@ -715,17 +752,17 @@ function setupArticles() {
         });
     }
 
-    let progressBoxes = document.getElementsByClassName("progress-box");
-    for (let box of progressBoxes) {
-        box.addEventListener("contextmenu", event => {
-            if (getSelection().type === "Range") {
-                return;
-            }
-            event.preventDefault();
-            let label = event.currentTarget;
-            // placeProgressPanel(label); TODO key
-        })
-    }
+    // let progressBoxes = document.getElementsByClassName("progress-box");
+    // for (let box of progressBoxes) {
+    //     box.addEventListener("contextmenu", event => {
+    //         if (getSelection().type === "Range") {
+    //             return;
+    //         }
+    //         event.preventDefault();
+    //         let label = event.currentTarget;
+    //         // placeProgressPanel(label); TODO key
+    //     })
+    // }
 
 }
 
@@ -811,7 +848,7 @@ function setupLabels() {
         label.addEventListener("contextmenu", event => {
             let label = event.currentTarget;
             let key = label.getAttribute("data-article");
-            lastClickedKey = key;
+            progressPanelTarget = key;
             if (getSelection().type === "Range") {
                 return;
             }
@@ -876,11 +913,11 @@ function setupProgressWindow() {
     let levels = document.getElementsByClassName("progress-level");
     for (let level of levels) {
         level.addEventListener("click", event => {
-            if (lastClickedKey === null) return;
+            if (progressPanelTarget === null) return;
             let level = event.currentTarget;
             let l = level.getAttribute("data-level");
-            setProgress(lastClickedKey, l, new Date());
-            fillProgressLog(lastClickedKey);
+            setProgress(progressPanelTarget, l, new Date());
+            fillProgressLog(progressPanelTarget);
         });
     }
 }
@@ -982,7 +1019,7 @@ function setProgress(key, levelstr, timestamp) {
             progress.classList.add("level5");
         }
 
-        if (level === 5) {
+        if (level === 1) {
             progress.classList.add("progress-completed");
         } else {
             progress.classList.remove("progress-completed");
@@ -990,44 +1027,38 @@ function setProgress(key, levelstr, timestamp) {
 
     }
 
-    let articles = document.getElementsByClassName("article");
+    let articles = document.getElementsByClassName("link");
     for (let article of articles) {
         if (key !== article.getAttribute("data-article")) {
             continue;
         }
         for (let child of article.children) {
-            if (!child.classList.contains("content")) {
+            if (!child.classList.contains("progress-box")) {
                 continue;
             }
-            for (let child3 of child.children) {
-                if (!child3.classList.contains("progress-box")) {
-                    continue;
-                }
-                let child2 = child3.getElementsByClassName("progress")[0];
-                //// TODO
-                if (level === 0) {
-                    child2.classList.remove("level1", "level2", "level3", "level4", "level5");
-                } else if (level === 1) {
-                    child2.classList.add("level1");
-                } else if (level === 2) {
-                    child2.classList.add("level2");
-                } else if (level === 3) {
-                    child2.classList.add("level3");
-                } else if (level === 4) {
-                    child2.classList.add("level4");
-                } else if (level === 5) {
-                    child2.classList.add("level5");
-                }
-                ////
-
+            //// TODO
+            if (level === 0) {
+                child.classList.remove("level1", "level2", "level3", "level4", "level5");
+            } else if (level === 1) {
+                child.classList.add("level1");
+            } else if (level === 2) {
+                child.classList.add("level2");
+            } else if (level === 3) {
+                child.classList.add("level3");
+            } else if (level === 4) {
+                child.classList.add("level4");
+            } else if (level === 5) {
+                child.classList.add("level5");
             }
+            ////
+
         }
     }
 
 }
 
 function updateProgress() {
-    let labels = document.getElementsByClassName("label");
+    let labels = document.getElementsByClassName("link");
     for (let label of labels) {
         let key = label.getAttribute("data-article");
         let p = progress.get(key);
@@ -1037,27 +1068,26 @@ function updateProgress() {
             if (!child.classList.contains("progress-box")) {
                 continue;
             }
-            let child2 = child.getElementsByClassName("progress")[0];
             //// TODO
-            child2.classList.remove("level1", "level2", "level3", "level4", "level5");
+            child.classList.remove("level1", "level2", "level3", "level4", "level5");
             if (level === 0) {
 
             } else if (level === 1) {
-                child2.classList.add("level1");
+                child.classList.add("level1");
             } else if (level === 2) {
-                child2.classList.add("level2");
+                child.classList.add("level2");
             } else if (level === 3) {
-                child2.classList.add("level3");
+                child.classList.add("level3");
             } else if (level === 4) {
-                child2.classList.add("level4");
+                child.classList.add("level4");
             } else if (level === 5) {
-                child2.classList.add("level5");
+                child.classList.add("level5");
             }
 
             if (level === 5) {
-                child2.classList.add("progress-completed");
+                child.classList.add("progress-completed");
             } else {
-                child2.classList.remove("progress-completed");
+                child.classList.remove("progress-completed");
             }
 
             ////

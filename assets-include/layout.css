@@ -6,8 +6,19 @@
 /*}*/
 
 
-.serif * {
+.serif {
     font-family: serif;
+    font-weight: normal;
+    color: grey;
+}
+
+.serif strong {
+    color: white;
+}
+
+.serif b {
+    color: white;
+    font-style: italic;
 }
 
 :root {
@@ -100,7 +111,7 @@ main {
 
 main.main-both {
     grid-template-areas: "menu labels articles";
-    grid-template-columns: 32px 1fr max-content;
+    grid-template-columns: 32px 740px max-content;
 }
 main.main-overview {
     grid-template-areas: "menu labels";
@@ -354,6 +365,7 @@ main.main-details {
     padding-right: var(--label-header-spacing);
     cursor: pointer;
     text-wrap: nowrap;
+    background-color: #5b5b5b;
 }
 
 /*.label > .cind {*/
@@ -479,7 +491,7 @@ main.main-details {
     background-color: #9c9b48;
 }
 
-.level1 {
+.link > .level1 > .progress, .level1 {
     color: #34baf4;
     //background-image: url("pearl1.png");
     background-image: url("check.png");
@@ -490,7 +502,7 @@ main.main-details {
     //filter: brightness(150%);
 }
 
-.level2 {
+.link > .level2 > .progress, .level2 {
     color: #d89735;
     background-image: url("pearl2.png");
     background-repeat: no-repeat;
@@ -498,7 +510,7 @@ main.main-details {
     filter: hue-rotate(30deg);
 }
 
-.level3 {
+.link > .level3 > .progress, .level3 {
     color: #d89735;
     background-image: url("pearl3.png");
     background-repeat: no-repeat;
@@ -506,14 +518,14 @@ main.main-details {
     filter: hue-rotate(30deg);
 }
 
-.level4 {
+.link > .level4 > .progress, .level4 {
     color: #d89735;
     background-image: url("pearl4.png");
     background-repeat: no-repeat;
     background-position: center;
 }
 
-.level5 {
+.link > .level5 > .progress, .level5 {
 //background-color: #ffee00;
     background-image: url("check.png");
     background-repeat: no-repeat;

@@ -1,10 +1,10 @@
 use std::rc::Rc;
-use khi::{Catenation, Element, List, Tagged, Tuple, Value};
+use khi::{Catenation, Element, List, TaggedTuple, Value};
 use khi::parse::pdm::ParsedValue;
 use crate::article::{verify_parameter_match, Parameters};
 use crate::name::{Name, NameElement};
 use crate::makro::MacroMap;
-use crate::markup::{process_markup, Markup};
+use crate::markup::{process_unexpanded_markup, Markup};
 use crate::tuple_split;
 
 pub fn read_names(macros: &impl MacroMap, name_value: &ParsedValue) -> Result<(Vec<Name>, Parameters), String> {
@@ -34,14 +34,18 @@ fn read_name(macros: &impl MacroMap, name_value: &ParsedValue) -> Result<(Name, 
     let mut elements = vec![];
     let mut parameters = vec![];
     match name_value {
-        ParsedValue::Tuple(tuple, _, _) => {
-            if tuple.is_empty() {
-                elements.push(NameElement::Preposition(Markup::raw("?"))); // TODO: ? should be type name.
+        ParsedValue::TaggedTuple(tuple, _, _) => {
+            if (tuple.tag.is_some()) {
+                if tuple.is_empty() {
+                    elements.push(NameElement::Preposition(Markup::raw("?"))); // TODO: ? should be type name.
+                } else {
+                    return Err(format!("Name must be empty tuple or compound of text, tags, nils and compounds."));
+                }
             } else {
-                return Err(format!("Name must be empty tuple or compound of text, tags, nils and compounds."));
+                read_name_element(macros, &mut elements, &mut parameters, name_value)?;
             }
         }
-        ParsedValue::Nil(..) | ParsedValue::Text(..) | ParsedValue::Tagged(..) => {
+        ParsedValue::Nil(..) | ParsedValue::Text(..) => {
             read_name_element(macros, &mut elements, &mut parameters, name_value)?;
         }
         ParsedValue::Catenation(catenation, _, _) => {
@@ -50,7 +54,7 @@ fn read_name(macros: &impl MacroMap, name_value: &ParsedValue) -> Result<(Name, 
                     Element::Element(i) => {
                         read_name_element(macros, &mut elements, &mut parameters, i)?;
                     }
-                    Element::Whitespace => {
+                    Element::Separator => {
                         elements.push(NameElement::Preposition(Markup::raw(" ")));
                     }
                 }
@@ -73,36 +77,35 @@ fn read_name(macros: &impl MacroMap, name_value: &ParsedValue) -> Result<(Name, 
 
 fn read_name_element(macros: &impl MacroMap, parametrization: &mut Vec<NameElement>, parameters: &mut Vec<Rc<str>>, element: &ParsedValue) -> Result<(), String> {
     match element {
-        ParsedValue::Tagged(tagged, _, _) => {
-            let name = tagged.name.as_ref();
+        ParsedValue::TaggedTuple(tagged, _, _) => {
+            let name = tagged.name().unwrap();
             if name.starts_with("@") { // TODO: @1, @2, @3, ... - Reorderable parameters
                 let name = name.strip_prefix("@").unwrap();
-                let argument = tagged.get();
-                let (argument, named) = tuple_split(argument);
+                let (argument, named) = tuple_split(tagged);
                 if argument.len() != 1 {
                     return Err(format!("Markup takes 1 argument."));
                 }
                 let argument = argument.get(0).unwrap();
                 if name.is_empty() {
-                    let text = process_markup(macros, argument)?;
+                    let text = process_unexpanded_markup(macros, argument)?;
                     parametrization.push(NameElement::Name(text));
                 } else {
-                    let text = process_markup(macros, argument)?;
+                    let text = process_unexpanded_markup(macros, argument)?;
                     let key = Rc::from(name);
                     parametrization.push(NameElement::Parameter { markup: text, class: key });
                     parameters.push(Rc::from(name));
                 }
             } else {
-                let text = process_markup(macros, element)?;
+                let text = process_unexpanded_markup(macros, element)?;
                 parametrization.push(NameElement::Preposition(text));
             }
         }
         ParsedValue::Catenation(..) | ParsedValue::Nil(..) | ParsedValue::Text(..) => {
-            let text = process_markup(macros, element)?;
+            let text = process_unexpanded_markup(macros, element)?;
             parametrization.push(NameElement::Preposition(text));
         }
-        ParsedValue::Tuple(..) | ParsedValue::Dictionary(..) | ParsedValue::List(..) => {
-            return Err(format!("Name element cannot be tuple, dictionary or list."));
+        ParsedValue::Dictionary(..) | ParsedValue::List(..) => {
+            return Err(format!("Name element cannot be dictionary or list."));
         }
     }
     Ok(())

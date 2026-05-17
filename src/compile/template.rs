@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
-use khi::{Catenation, Dictionary, Element, List, Tagged, Text, Value};
-use khi::parse::pdm::{ParsedDictionary, ParsedList, ParsedText, ParsedValue};
+use khi::{Catenation, Dictionary, Element, List, TaggedTuple, Text, Value};
+use khi::parse::pdm::{ParsedDictionary, ParsedList, ParsedValue};
 use crate::relation::{RelationClass, Relation};
 use crate::file::{read_excludable_file_to_string, read_file_content_to_dictionary};
 
@@ -215,14 +215,19 @@ fn tokenize_relation_statement(statement: &ParsedValue) -> Result<Vec<Token>, St
                 tokens.extend(es);
             }
         }
-    } else if statement.is_tagged() {
-        let tag = statement.as_tagged().unwrap();
-        if tag.name() == "this" {
+    } else if statement.is_tagged_tuple() {
+        let tag = statement.as_tagged_tuple().unwrap();
+        let name = if let Some(name) = tag.name() {
+            name
+        } else {
+            return Err(format!("Tag name error at {}:{}", statement.from().line, statement.from().column));
+        }; // TODO Remove this check?
+        if name == "this" {
             tokens.push(Token::This);
-        } else if tag.name() == "arg" {
+        } else if name == "arg" {
             tokens.push(Token::Arg);
         } else {
-            return Err(format!("Unknown tag: {}", tag.name()));
+            return Err(format!("Unknown tag: {}", name));
         }
     }
     Ok(tokens)
