@@ -1,13 +1,13 @@
 [package]
 name = "lexikon"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # khi = { version = "0.16.1", features = ["tex"] }
-khi = { path = "../khi.rs" }
+khi = { path = "../../khi.fmt/khi.rs" }
 zeroarg = "0.1.0"
 include_dir = "0.7.4"
 serde = { version = "1.0.217", features = ["derive"] }

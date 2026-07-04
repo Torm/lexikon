@@ -210,7 +210,7 @@ fn tokenize_relation_statement(statement: &ParsedValue) -> Result<Vec<Token>, St
     } else if statement.is_catenation() {
         let cat = statement.as_catenation().unwrap();
         for e in cat.iter() {
-            if let Element::Element(f) = e {
+            if let Element::Element(f, b) = e {
                 let es = tokenize_relation_statement(f)?;
                 tokens.extend(es);
             }

@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::Write;
 use std::ops::Deref;
 use std::path::Path;
+use std::rc::Rc;
 use crate::article::{Article, Articles, Class};
 use crate::compile::project::ResolutionPaths;
 use crate::document::{Document, DocumentElement, PanelElement};
@@ -11,8 +12,8 @@ use crate::name::{Name, NameElement};
 use crate::style::Styles;
 use crate::web::class::generate_article_content;
 
-pub fn write_documents(styles: &Styles, resolve_paths: &ResolutionPaths, articles: &Articles, root_path: &Path, documents: &[Document]) -> Result<(), String> {
-    let document_dir_path = root_path.join("documents");
+pub fn write_documents(styles: &Styles, resolve_paths: &ResolutionPaths, articles: &Articles, web_path: &Path, documents: &[Rc<Document>]) -> Result<(), String> {
+    let document_dir_path = web_path.join("documents");
     fs::create_dir(&document_dir_path); // Create the documents directory.
     for document in documents {
         write_document(styles, resolve_paths, articles, &document_dir_path, document)?;
@@ -20,15 +21,10 @@ pub fn write_documents(styles: &Styles, resolve_paths: &ResolutionPaths, article
     Ok(())
 }
 
-fn write_document(styles: &Styles, resolve_paths: &ResolutionPaths, articles: &Articles, document_dir_path: &Path, document: &Document) -> Result<(), String> {
+pub fn write_document(styles: &Styles, resolve_paths: &ResolutionPaths, articles: &Articles, document_dir_path: &Path, document: &Document) -> Result<(), String> {
     let mut document_path = document_dir_path.to_path_buf();
-    for node in &document.dir_crumbs {
-        document_path.push(&node.dir_name);
-        if !fs::exists(&document_path).unwrap() { // Create the directory if it does not exist.
-            fs::create_dir(&document_path).unwrap();
-        }
-    }
-    let file_name = document.file_name.as_str();
+    let file_name = document.file_name.to_str().unwrap();
+
     let file_name = if file_name.ends_with(".doc.khi") {
         file_name.trim_end_matches(".doc.khi")
     } else if file_name.ends_with(".document.khi") {
@@ -44,6 +40,8 @@ fn write_document(styles: &Styles, resolve_paths: &ResolutionPaths, articles: &A
     Ok(())
 }
 
+
+
 pub fn generate_document_page(styles: &Styles, resolve_paths: &ResolutionPaths, articles: &Articles, document: &Document) -> Result<String, String> {
     let mut html = vec![];
     let mut template = include_str!("../../templates/template.html").as_bytes();
@@ -54,10 +52,12 @@ pub fn generate_document_page(styles: &Styles, resolve_paths: &ResolutionPaths, 
             template = &template[7..];
         } else if template.starts_with(b"{NAV}") { // TODO: Replace w Nav path
             let mut path = String::from("/documents");
-            for node in &document.dir_crumbs {
+            let mut dirtrail = document.dirtrail();
+            dirtrail.remove(0); // TODO Because doc root repeats
+            for dir in dirtrail {
                 path.push('/');
-                path.push_str(&node.dir_name);
-                let crumb = node.crumb.as_ref().unwrap_or(&node.dir_name);
+                path.push_str(&dir.file_name.to_str().unwrap());
+                let crumb = dir.name.as_str();
                 let link = format!(r#"<a href="{}">{}</a>"#, &path, crumb);
                 html.extend_from_slice(link.as_bytes());
             }
@@ -112,9 +112,9 @@ fn generate_links_panel(styles: &Styles, resolve_paths: &ResolutionPaths, articl
         match element {
             PanelElement::Heading { level, heading, index } => {
                 if let Some(index) = index {
-                    html.extend_from_slice(format!(r#"<h{level}><span>{index}</span> <span>{}</span></h{level}>"#, heading.0).as_bytes());
+                    html.extend_from_slice(format!(r#"<hr><h{level}><span>{index}</span> <span>{}</span></h{level}>"#, heading.0).as_bytes());
                 } else {
-                    html.extend_from_slice(format!(r#"<h{level}><span>{}</span></h{level}>"#, heading.0).as_bytes());
+                    html.extend_from_slice(format!(r#"<hr><h{level}><span>{}</span></h{level}>"#, heading.0).as_bytes());
                 }
             }
             PanelElement::ArticleLink { key, index } => {

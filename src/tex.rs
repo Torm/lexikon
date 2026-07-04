@@ -1,5 +1,5 @@
 use std::fmt::Write;
-use khi::{Catenation, Dictionary, Element, List, TaggedTuple, Text, TupleElement, Value};
+use khi::{Catenation, Dictionary, Element, List, TaggedTuple, Text, TextType, Value};
 use khi::parse::pdm::{ParsedList, ParsedTaggedTuple, ParsedText, ParsedValue, Position};
 use crate::makro::{MacroMap};
 use crate::{tuple_split};
@@ -229,10 +229,9 @@ impl<M: MacroMap> Writer<'_, M> {
     /// Write text, respecting reserved and escaped characters.
     fn write_text(&mut self, text: &ParsedText) {
         let mut string = text.str.chars();
-        let mut escapes = text.escapes.iter();
+        let e = text.text_type == TextType::Escaped;
         while let Some(c) = string.next() {
-            let e = escapes.next().unwrap();
-            if *e {
+            if e {
                 self.normalize_and_push_char(c);
             } else {
                 if c == '^' {
@@ -269,7 +268,7 @@ impl<M: MacroMap> Writer<'_, M> {
                 self.push('{');
                 for element in catenation.iter() {
                     match element {
-                        Element::Element(solid) => {
+                        Element::Element(solid, b) => {
                             self.write_inner(solid);
                         }
                         Element::Separator => {
@@ -361,14 +360,14 @@ impl<M: MacroMap> Writer<'_, M> {
             self.write_inner(substitute)?;
             self.output.push('}');
             self.last_type = LastType::Glyph;
-        } else if name == "raw" {
+        } else if name == "raw!" {
             let lines = tag.get_attribute_by("l").is_some() || tag.get_attribute_by("lines").is_some();
             if tuple.len() != 1 {
-                return Err(PreprocessorError::MacroError(at, format!("<raw> takes 1 text argument.")));
+                return Err(PreprocessorError::MacroError(at, format!("<raw!> takes 1 text argument.")));
             }
             let argument = tuple.get(0).unwrap();
             if !argument.is_text() {
-                return Err(PreprocessorError::MacroError(at, format!("<raw> takes 1 text argument.")));
+                return Err(PreprocessorError::MacroError(at, format!("<raw!> takes 1 text argument.")));
             }
             let text = argument.as_text().unwrap();
             if lines {
@@ -497,7 +496,7 @@ impl<M: MacroMap> Writer<'_, M> {
             ParsedValue::Catenation(catenation, ..) => {
                 for element in catenation.iter_mut() {
                     match element {
-                        Element::Element(e) => self.expand_value(e, parameters)?,
+                        Element::Element(e, b) => self.expand_value(e, parameters)?,
                         Element::Separator => {}
                     }
                 }
@@ -510,8 +509,7 @@ impl<M: MacroMap> Writer<'_, M> {
     fn expand_tuple(&mut self, parametrized_tuple: &mut ParsedTaggedTuple, parameters: &[&ParsedValue]) -> Result<(), String> {
         for element in parametrized_tuple.iter_mut() {
             match element {
-                TupleElement::Positional(mut v) => self.expand_value(&mut v, parameters)?,
-                TupleElement::Named(k, mut v) => self.expand_value(&mut v, parameters)?,
+                mut v => self.expand_value(&mut v, parameters)?,
             }
         }
         Ok(())

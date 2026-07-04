@@ -11,7 +11,8 @@ use crate::key::KeyReader;
 use crate::tex::{write_tex_with, BreakMode};
 use crate::{tex_error_to_text, tuple_split};
 use crate::compile::name::read_names;
-use crate::markup::{process_unexpanded_markup, Markup};
+use crate::markup::{Markup};
+use crate::preprocess_markup::process_unexpanded_markup;
 use crate::types::ArticleMeta;
 
 /// Read an article definition.
@@ -292,7 +293,7 @@ pub fn process_article_content(macros: &impl MacroMap, input: &ParsedValue) -> R
                 // return Err(format!("Element of article content list at {}:{} must be a tagged value", c.from().line, c.from().column));
                 // TODO: Below is very temporary workaround.
                 let txt = process_unexpanded_markup(macros, c)?;
-                article_elements.push(ArticleElement::Paragraph(Markup::raw(&format!(r#"<p>{}</p>"#, &txt.0)))); // TODO Use Paragraph but wrap in div not p?
+                article_elements.push(ArticleElement::Markup(Markup::raw(&format!(r#"<p>{}</p>"#, &txt.0)))); // TODO Use Paragraph but wrap in div not p?
                 continue;
             }
             let tag = c.as_tagged_tuple().unwrap();
@@ -308,12 +309,12 @@ pub fn process_article_content(macros: &impl MacroMap, input: &ParsedValue) -> R
                 article_elements.push(ArticleElement::Heading { level, markup: tex });
             } else if name == "P" {
                 let tex = process_unexpanded_markup(macros, tuple.get(0).unwrap())?;
-                article_elements.push(ArticleElement::Paragraph(tex));
+                article_elements.push(ArticleElement::Markup(tex));
             } else if name == "$$" {
                 let tex = write_tex_with(tuple.get(0).unwrap(), macros, BreakMode::Never).or_else(tex_error_to_text)?;
                 let tex = format!("\\[{tex}\\]");
                 let tex = Markup::raw(&tex);
-                article_elements.push(ArticleElement::Paragraph(tex));
+                article_elements.push(ArticleElement::Markup(tex));
             // } else if name == "Ol" {
             //     if !tag.value.is_list() {
             //         return Err(format!("Expected list at {}:{}.", tag.value.from().line, tag.value.from().column));
@@ -338,16 +339,43 @@ pub fn process_article_content(macros: &impl MacroMap, input: &ParsedValue) -> R
             //     }
             //     html.push_str("</ul>");
             //     article_elements.push(ArticleElement::Html(html));
+            } else if name == "L" {
+                let numbered = if tag.has_attributes() {
+                    true
+                } else {
+                    false
+                };
+                let value = tuple.get(0).unwrap();
+                if !value.is_list() {
+                    return Err(format!("Expected list at {}:{}.", value.from().line, value.from().column));
+                }
+                let list = value.as_list().unwrap();
+                let mut html = String::new();
+                if numbered {
+                    html.push_str("<ol>");
+                } else {
+                    html.push_str("<ul>");
+                }
+                for v in list.iter() {
+                    html.push_str(&format!("<li>{}</li>", &process_unexpanded_markup(macros, v)?.0));
+                }
+                if numbered {
+                    html.push_str("</ol>");
+                } else {
+                    html.push_str("</ul>");
+                }
+                article_elements.push(ArticleElement::Markup(Markup::raw(&html)));
             } else {
                 // return Err(format!("Element of article content list at {}:{} must be a heading or paragraph.", c.from().line, c.from().column));
                 // TODO Here, if no article formatting command is found, we just delegate to reading markup.
-                let tex = process_unexpanded_markup(macros, tuple.get(0).unwrap())?;
-                article_elements.push(ArticleElement::Paragraph(tex));
+                let tex = process_unexpanded_markup(macros, c)?;
+                article_elements.push(ArticleElement::Markup(tex));
             }
         }
     } else {
         let tex = process_unexpanded_markup(macros, input)?;
-        article_elements.push(ArticleElement::Paragraph(tex));
+        //article_elements.push(ArticleElement::Paragraph(tex));
+        article_elements.push(ArticleElement::Markup(Markup::raw(&format!(r#"<p>{}</p>"#, &tex.0)))); // TODO fix <p>
     }
     Ok(article_elements)
 }

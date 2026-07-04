@@ -145,7 +145,7 @@ pub struct Article {
 #[derive(Clone)]
 pub enum ArticleElement {
     Heading { level: u8, markup: Markup },
-    Paragraph(Markup),
+    Markup(Markup),
     /// Line that indicates separation between two instances of an article in the document.
     LocalSeparator,
 }

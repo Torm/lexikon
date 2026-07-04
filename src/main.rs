@@ -12,17 +12,21 @@ mod strings;
 mod style;
 pub mod relation;
 mod types;
+mod preprocess_markup;
+pub mod dir;
 
 use std::{env, fs};
-use std::path::Path;
-use khi::{Dictionary, TaggedTuple, Text, TupleElement, Value};
-use khi::parse::pdm::{ParsedDictionary, ParsedTaggedTuple, ParsedTupleElement, ParsedValue};
+use std::ffi::OsString;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use khi::{Dictionary, TaggedTuple, Text, Value};
+use khi::parse::pdm::{ParsedDictionary, ParsedTaggedTuple, ParsedValue};
 use zeroarg::{parse_arguments, Argument};
 use crate::article::Articles;
 use crate::compile::config::read_configuration_files;
 use crate::compile::document::read_source_dir;
 use crate::compile::project::{read_project_file, ProjectSettings};
-use crate::compile::style::{read_style_file};
+use crate::compile::style::read_style_file;
 use crate::compile::template::Templates;
 use crate::document::Documents;
 use crate::makro::Macros;
@@ -30,6 +34,7 @@ use crate::style::Styles;
 use crate::web::asset::{include_assets, include_static_assets};
 use crate::web::class::write_class_directory;
 use crate::web::class_style::{write_class_style_css_file, write_class_style_json_file};
+use crate::web::dirpage::write_dir_indexes;
 use crate::web::document::write_documents;
 
 type Html = String;
@@ -97,31 +102,39 @@ pub fn compile() -> Result<(), String> {
     // Read document source directory.
     let mut articles = Articles::new();
     let mut documents = Documents::new();
-    read_source_dir(&templates, &resolution_paths, &macros, &mut articles, &mut documents, &Path::new("src"))?;
-    eprintln!("Compelte. Art: {} Class: {} Docs: {}", articles.article_map.len(), articles.class_map.len(), documents.len()); ////////////////////////////////////////////
+    let tree = read_source_dir(&templates, &resolution_paths, &macros, &mut articles, &mut documents, Path::new("src"), OsString::from("src"))?;
+    eprintln!("Complete. Articles: {} Classes: {} Documents: {}", articles.article_map.len(), articles.class_map.len(), documents.len()); ////////////////////////////////////////////
     // Read dependencies.
 //    dependency::read_dependencies(&mut articles, &mut documents, read_project.dependencies.as_slice())?;//todo
     // Write website.
-    let temp_path = Path::new(".website.tmp");
+    let temp_web_path = Path::new(".website.tmp");
     let target_path = Path::new("website");
     // Clear and create temp target directory if it was for some reason not cleaned.
-    if fs::exists(temp_path).unwrap() {
-        fs::remove_dir_all(temp_path);
+    if fs::exists(temp_web_path).unwrap() {
+        fs::remove_dir_all(temp_web_path).unwrap();
     }
-    fs::create_dir(temp_path);
+    fs::create_dir(temp_web_path).unwrap();
     // Write website files.
-    write_class_style_json_file(temp_path, &styles)?;
-    write_class_style_css_file(temp_path, &styles)?;
-    write_class_directory(temp_path, &articles)?;
-    write_documents(&styles, &resolution_paths, &articles, temp_path, &documents)?;
+    write_class_style_json_file(temp_web_path, &styles)?;
+    write_class_style_css_file(temp_web_path, &styles)?;
+    write_class_directory(temp_web_path, &articles)?;
+    write_dir_indexes(&styles, &resolution_paths, &articles, temp_web_path, &PathBuf::from("/"), &documents, &tree)?;
+    //write_documents(&styles, &resolution_paths, &articles, temp_web_path, &documents)?; // Todo: merge write docs and dirs into write_tree
     //write_index(Path::new(""), temp_path);
-    include_static_assets(temp_path)?;
-    include_assets(temp_path)?;
+    include_static_assets(temp_web_path)?;
+    include_assets(temp_web_path)?;
 //    include_index_and_icon(temp_path)?;
 //    carry_modification_dates(target_path, temp_path)?;
     // Replace the old target directory with the newly generated files.
-    fs::remove_dir_all(target_path);
-    fs::rename(temp_path, target_path);
+     
+    match fs::remove_dir_all(target_path) {
+        Ok(_) => {}
+        Err(e) => {eprintln!("Error deleting dir: {}", e.to_string())}
+    }
+    match fs::rename(temp_web_path, target_path) {
+        Ok(_) => {}
+        Err(e) => {eprintln!("Error renaming dir: {}", e.to_string())}
+    }
 //    // Clear and create temp target directory.
 //    if fs::exists(temp_path).unwrap() {
 //        fs::remove_dir_all(temp_path);
@@ -159,14 +172,7 @@ pub fn tuple_split(tuple: &ParsedTaggedTuple) -> (Vec<&ParsedValue>, Vec<(&str, 
     let mut positional = vec![];
     let mut named = vec![];
     for element in tuple.iter() {
-        match element {
-            TupleElement::Positional(e) => {
-                positional.push(e);
-            }
-            TupleElement::Named(n, e) => {
-                named.push((n, e));
-            }
-        }
+        positional.push(element);
     }
     (positional, named)
 }

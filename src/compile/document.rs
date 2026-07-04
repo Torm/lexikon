@@ -1,21 +1,27 @@
+use std::alloc::{alloc, alloc_zeroed, Layout};
 use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
 use std::fs::{read_dir, File};
 use std::io::Read;
+use std::mem::{uninitialized, zeroed, MaybeUninit};
 use std::path::{Path};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use khi::{Dictionary, List, TaggedTuple, Text, Value};
 use khi::parse::parse::parse_dictionary_str;
 use khi::parse::pdm::{ParsedDictionary, ParsedList, ParsedTaggedTuple, Position};
+use rand::TryRngCore;
 use crate::article::{Articles};
 use crate::compile::article::{read_article};
 use crate::compile::makro::{read_macro_definitions_list};
 use crate::compile::project::{DependencyInclude, ResolutionPaths};
-use crate::compile::template::{Template, Templates};
-use crate::document::{DirCrumb, Document, DocumentElement, PanelElement};
+use crate::compile::template::{Templates};
+use crate::dir::Dir;
+use crate::document::{Document, DocumentElement, PanelElement};
 use crate::file::{read_excludable_file_to_string, read_file_content_to_dictionary};
 use crate::makro::{LocalMacroRegistry, MacroMap, Macros};
 use crate::key::KeyReader;
-use crate::markup::{process_unexpanded_markup, Markup};
+use crate::markup::{Markup};
+use crate::preprocess_markup::process_unexpanded_markup;
 use crate::tuple_split;
 
 /// Directory configuration. Stored in dir.khi files. Only contains Directory name at the moment.
@@ -51,25 +57,42 @@ pub(crate) fn read_dir_file(dir_file_path: &Path) -> Result<DirConfig, String> {
 }
 
 /// Read a source dir. Recursively reads all nested directories and document files.
-pub fn read_source_dir(templates: &Templates, resolution_paths: &ResolutionPaths, macros: &Macros, data: &mut Articles, documents: &mut Vec<Document>, path: &Path) -> Result<(), String> {
-    let mut crumb_stack = vec![];
-    read_document_dir(templates, resolution_paths, macros, data, documents, &mut crumb_stack, path)?;
-    Ok(())
+pub fn read_source_dir(templates: &Templates, resolution_paths: &ResolutionPaths, macros: &Macros, data: &mut Articles, documents: &mut Vec<Rc<Document>>, path: &Path, file_name: OsString) -> Result<Rc<Dir>, String> {
+    read_document_dir(templates, resolution_paths, macros, data, documents, path, file_name, None)
 }
 
 /// Read a document dir.
-fn read_document_dir(templates: &Templates, resolution_paths: &ResolutionPaths, macros: &Macros, data: &mut Articles, documents: &mut Vec<Document>, crumb_buffer: &mut Vec<Rc<DirCrumb>>, path: &Path) -> Result<(), String> {
-    {
+fn read_document_dir(
+    templates: &Templates, resolution_paths: &ResolutionPaths, macros: &Macros,
+    data: &mut Articles, documents: &mut Vec<Rc<Document>>, path: &Path,
+    file_name: OsString, parent: Option<Weak<Dir>>,
+) -> Result<Rc<Dir>, String> {
+
+    let name = {
         let dir_file_path = path.join("dir.khi");
-        if dir_file_path.exists() {
-            let dir_crumb = read_dir_file(&dir_file_path)?;
-            if crumb_buffer.len() > 0 {
-                let crumb = crumb_buffer.pop().unwrap();
-                let crumb = DirCrumb { dir_name: crumb.dir_name.clone(), crumb: Some(dir_crumb) };
-                crumb_buffer.push(Rc::new(crumb));
+        if dir_file_path.exists() { // TODO Is file?
+            let dir_config = read_dir_file(&dir_file_path)?;
+            dir_config
+        } else {
+            if parent.is_some() { // The tree root changes name from src to documents.
+                file_name.clone().into_string().unwrap()
+            } else {
+                String::from("Documents")
             }
         }
-    }
+    };
+
+    // Todo: Use the UniqueRc when it is stable
+    let dir = {
+        let dir: Dir = Dir { name: name.clone(), file_name: OsString::from("ERROR"), subdirs: vec![], subdocs: vec![], parent: parent.clone() };
+        Rc::new(dir)
+    };
+    let w = Rc::downgrade(&dir);
+
+
+    let mut subdirs = vec![];
+    let mut subdocs = vec![];
+
     for dir_entry in read_dir(&path).unwrap() {
         let dir_entry = dir_entry.unwrap();
         let file_name = dir_entry.file_name();
@@ -78,32 +101,45 @@ fn read_document_dir(templates: &Templates, resolution_paths: &ResolutionPaths, 
             if file_name.as_encoded_bytes().ends_with(b".document.khi") || file_name.as_encoded_bytes().ends_with(b".doc.khi") {
                 let document_path = path.join(&file_name);
                 eprintln!("Reading document file {}", document_path.to_str().unwrap());
-                read_document_file(templates, documents, data, macros, DependencyInclude::All, crumb_buffer, file_name.to_str().unwrap(), &document_path)?;
+                let subdoc = read_document_file(templates, documents, data, macros, DependencyInclude::All, file_name, &document_path, w.clone())?;
+                if let Some(subdoc) = subdoc { // If the file is not excluded.
+                    subdocs.push(subdoc);
+                }
             }
         } else if entry_type.is_dir() {
             let dir_path = path.join(&file_name);
-            let pathn = file_name.to_str().unwrap().to_string();
-            crumb_buffer.push(Rc::new(DirCrumb { dir_name: pathn , crumb: None }));
-            read_document_dir(templates, resolution_paths, macros, data, documents, crumb_buffer, &dir_path)?;
-            crumb_buffer.pop();
+            let subdir = read_document_dir(templates, resolution_paths, macros, data, documents, &dir_path, file_name, Some(w.clone()))?;
+            subdirs.push(subdir);
         }
     }
-    Ok(())
+    // Todo: Use the UniqueRc when it is stable
+    let dir = unsafe {
+        let r = Rc::into_raw(dir);
+        let r = r.cast_mut();
+        let file_name = if parent.is_some() { // Tree root changes path from /src to /documents
+            file_name
+        } else {
+            OsString::from("documents")
+        };
+        *r = Dir { name, file_name, subdirs, subdocs, parent };
+        Rc::from_raw(r)
+    };
+    Ok(dir)
 }
 
 pub struct DocumentKey(String);
 
-pub fn read_document_file(templates: &Templates, documents: &mut Vec<Document>, registry: &mut Articles, macros: &Macros, include: DependencyInclude, crumbs: &Vec<Rc<DirCrumb>>, file_name: &str, path: &Path) -> Result<(), String> {
+pub fn read_document_file(templates: &Templates, documents: &mut Vec<Rc<Document>>, registry: &mut Articles, macros: &Macros, include: DependencyInclude, file_name: OsString, path: &Path, parent_dir: Weak<Dir>) -> Result<Option<Rc<Document>>, String> {
     let content = match read_excludable_file_to_string(path, "document")? {
-        None => return Ok(()),
+        None => return Ok(None),
         Some(c) => c,
     };
     let dict = read_file_content_to_dictionary(path, "document", &content)?;
-    read_document_khidict(templates, documents, registry, macros, include, crumbs, file_name, &dict)?;
-    Ok(())
+    let document = read_document_khidict(templates, documents, registry, macros, include, file_name, &dict, parent_dir)?;
+    Ok(Some(document))
 }
 
-pub fn read_document_khidict(templates: &Templates, documents: &mut Vec<Document>, registry: &mut Articles, macros: &Macros, include: DependencyInclude, crumbs: &Vec<Rc<DirCrumb>>, file_name: &str, document: &ParsedDictionary) -> Result<(), String> {
+pub fn read_document_khidict(templates: &Templates, documents: &mut Vec<Rc<Document>>, registry: &mut Articles, macros: &Macros, include: DependencyInclude, file_name: OsString, document: &ParsedDictionary, parent_dir: Weak<Dir>) -> Result<Rc<Document>, String> {
     let key = if let Some(key) = document.get("Key") {
         if !key.is_text() {
             return Err(format!("Key in document must be text."));
@@ -192,11 +228,10 @@ pub fn read_document_khidict(templates: &Templates, documents: &mut Vec<Document
         }
     }
     // Register document.
-    let dir_crumbs = crumbs.clone();
-    let file_name = String::from(file_name);
-    let document = Document { key, title, description, resolution_paths, file_name, dir_crumbs, structure };
-    documents.push(document);
-    Ok(())
+    let document = Document { key, title, description, resolution_paths, file_name, parent_dir, structure };
+    let document = Rc::new(document);
+    documents.push(document.clone());
+    Ok(document)
 }
 
 /// Read the content of a document.

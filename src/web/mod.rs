@@ -1,11 +1,11 @@
 use std::path::Path;
-use serde_json::{Value as JsonValue, Map as JsonMap};
+use serde_json::{Map as JsonMap, Value as JsonValue};
 
 pub mod class;
 pub mod asset;
 pub mod class_style;
 pub mod document;
-//pub mod dirpage;
+pub mod dirpage;
 pub mod index;
 //mod name;
 

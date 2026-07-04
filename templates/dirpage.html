@@ -14,20 +14,15 @@
 </head>
 <body>
 <header><nav>
-  <a href="/">Æ</a><a href="/documents">Docs</a>{NAV}<span class="toolbar-heading">{TITLE}</span>
+  <a href="/">Wiki</a>{NAV}<span class="toolbar-heading">{TITLE}</span>
 </nav></header>
-<main class="main-both">
+<main class="dir">
   <div id="toolbar">
     <!--     <div class="menubar-spacer"></div>-->
     <!--     <div class="menu-container">-->
     <!--       <button id="sort-by-section-button" class="toolbar-button">S<div class="tooltip">Arrange in sections</div></button>-->
     <!--       <button id="sort-by-tag-button" class="toolbar-button">T<div class="tooltip">Arrange in tags</div></button>-->
     <!--     </div>-->
-    <div class="menubar-spacer"></div>
-    <div class="menu-container">
-      <button id="close-all-button" class="toolbar-button"><div class="tooltip">Close all articles</div></button>
-      <button id="open-all-button" class="toolbar-button"><div class="tooltip">Open all articles</div></button>
-    </div>
     <!--    <div class="menubar-spacer"></div>-->
     <!--    <div class="menu-container">-->
     <!--      <div id="highlight-off-button" class="toolbar-button">P<div class="tooltip">Highlight: None</div></div>-->
@@ -35,7 +30,7 @@
     <!--      <div id="highlight-incomplete-button" class="toolbar-button">R<div class="tooltip">Highlight: Incomplete<br><br>Highlight incomplete articles.</div></div>-->
     <!--    </div>-->
   </div>
-  <article id="overview-tab"><h1><span>{TITLE}</span></h1>{OVERVIEW}</article>
+  <article id="dir-page" class="page">{CONTENT}</article>
 </main>
 <!--<footer></footer>-->
 </body>

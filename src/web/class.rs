@@ -120,7 +120,7 @@ pub(crate) fn generate_article_content(html: &mut Vec<u8>, content: &[ArticleEle
             ArticleElement::Heading { level, markup } => {
                 html.extend_from_slice(&format!("<h{level}>{}</h{level}>", markup.0.as_str()).as_bytes());
             }
-            ArticleElement::Paragraph(text) => {
+            ArticleElement::Markup(text) => {
                 html.extend_from_slice(&format!(r#"{}"#, text.0.as_str()).as_bytes());
             }
             ArticleElement::LocalSeparator => {
